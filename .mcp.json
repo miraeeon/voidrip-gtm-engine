@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gtm-autopilot": {
+      "command": "node",
+      "args": ["bin/gtm-mcp.mjs"]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "gtm-autopilot",
+  "version": "1.0.0",
+  "description": "Agent-native end-to-end GTM loop: Max (yourmax.ai) signal leads -> Claude classification, routing & sequences -> Overloop email + LinkedIn -> replies -> learning loop.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gtm": "bin/gtm.mjs",
+    "gtm-mcp": "bin/gtm-mcp.mjs"
+  },
+  "scripts": {
+    "setup": "node bin/gtm.mjs wizard",
+    "doctor": "node bin/gtm.mjs doctor",
+    "daily": "node bin/gtm.mjs daily",
+    "schedule": "node bin/gtm.mjs schedule install",
+    "unschedule": "node bin/gtm.mjs schedule remove",
+    "report": "node bin/gtm.mjs report",
+    "backup": "node bin/gtm.mjs backup",
+    "mcp": "node bin/gtm-mcp.mjs",
+    "gtm": "node bin/gtm.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "tsc --noEmit && vitest run && node scripts/mcp-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "commander": "^15.0.0",
+    "dotenv": "^18.0.4",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

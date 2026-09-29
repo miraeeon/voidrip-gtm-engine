@@ -1,0 +1,14 @@
+node_modules/
+.env
+*.env
+!.env.example
+# local state, backups and run lock — contain real people's data
+data/*.db
+data/*.db-*
+data/backups/
+data/.daily.lock
+# per-run agent payloads contain real people's data — never commit
+data/runs/
+data/seller-*.json
+reports/
+*.log
