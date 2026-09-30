@@ -27,6 +27,7 @@ Use the repository skills under `.agents/skills/`:
 - `gtm-write-sequence` for drafting;
 - `gtm-replies` for reply triage;
 - `gtm-learn` for the learning loop.
+- `gtm-local-e2e` for the Phase 9 CSV/JSON-to-review pipeline without live providers.
 
 ## Hard rules
 

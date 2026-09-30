@@ -9,6 +9,7 @@ import { callTool, TOOLS } from './tools.js';
 import { PLAYBOOK_FILE, savePlaybook } from './pipeline/playbook.js';
 import { backupDb, runDaily, scheduleInstall, scheduleRemove, scheduleStatus } from './ops.js';
 import { runWizard } from './wizard.js';
+import { parseCandidateFile } from './market-map/file-import.js';
 
 const program = new Command()
   .name('gtm')
@@ -60,6 +61,40 @@ program
   .description('pull new leads from Max')
   .option('-p, --pages <n>', 'max pages', (v) => Number(v), 10)
   .action((o) => run('gtm_source_leads', { max_pages: o.pages }));
+program
+  .command('import <file>')
+  .description('import a CSV or JSON candidate batch into the persistent Market Map')
+  .requiredOption('--lane <source-lane-id>', 'SourceLane id, for example H-A or V-A')
+  .option('--source <source>', 'source name recorded on every observation', 'manual-file')
+  .action((file, o) => {
+    const records = parseCandidateFile(fs.readFileSync(file, 'utf8'), file);
+    return run('gtm_ingest_candidates', { source: o.source, source_lane_id: o.lane, records });
+  });
+program
+  .command('market-resolution')
+  .description('show candidates needing Person + Project resolution')
+  .option('-l, --limit <n>', '', (v) => Number(v), 25)
+  .action((o) => run('gtm_get_resolution_queue', { limit: o.limit }));
+program
+  .command('market-boundary')
+  .description('show resolved Person + Project records ready for Boundary qualification')
+  .option('-l, --limit <n>', '', (v) => Number(v), 25)
+  .action((o) => run('gtm_get_boundary_queue', { limit: o.limit }));
+program
+  .command('market-priority')
+  .description('show PASS_OUTBOUND_V1 records needing activation priority')
+  .option('-l, --limit <n>', '', (v) => Number(v), 25)
+  .action((o) => run('gtm_get_priority_queue', { limit: o.limit }));
+program
+  .command('market-drafts')
+  .description('show activation-ready Market Map records needing a local draft')
+  .option('-l, --limit <n>', '', (v) => Number(v), 25)
+  .action((o) => run('gtm_get_market_drafting_queue', { limit: o.limit }));
+program
+  .command('market-review')
+  .description('show final local drafts awaiting human review')
+  .option('-l, --limit <n>', '', (v) => Number(v), 25)
+  .action((o) => run('gtm_get_market_review_queue', { limit: o.limit }));
 program
   .command('enrich')
   .description('check new leads against Overloop history (read-only)')
