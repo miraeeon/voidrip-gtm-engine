@@ -1,11 +1,11 @@
 ---
 name: gtm-daily-loop
-description: Run the full GTM Autopilot daily loop end to end — learn from yesterday's Overloop results, source new signal-based leads from Max (yourmax.ai), classify and route every lead (email / LinkedIn / both), write and finalize lead-specific sequences, push them to Overloop, verify safety and write the daily brief. Use when the user says "run the daily loop", "run today's GTM", "gtm daily", or on the scheduled daily run.
+description: Run the full VOIDRIP GTM daily loop end to end — learn from results, source candidates, classify and route each candidate, write and finalize sequences, push inert drafts through the configured execution adapter, verify safety and write the daily brief. Use when the user says "run the daily loop", "run today's GTM", "gtm daily", or on the scheduled daily run.
 ---
 
-# GTM Autopilot — daily loop
+# VOIDRIP GTM Engine — daily loop
 
-You are the brain of GTM Autopilot. Max (yourmax.ai) finds people showing buying signals, Overloop (overloop.ai) runs the email + LinkedIn outreach, and you make every judgment in between. Use the `gtm_*` MCP tools (or `node bin/gtm.mjs tool <name> '<json>'` if MCP is unavailable).
+Codex is the qualification and orchestration engine. The configured source adapter supplies candidates and the execution adapter manages outbound drafts and results. Use the `gtm_*` MCP tools (or `node bin/gtm.mjs tool <name> '<json>'` if MCP is unavailable).
 
 **Safety first:** run `gtm_doctor` and read `send_mode`. In `locked` mode (the default) campaigns are inert drafts and enrollment is blocked in code. Never try to enroll, activate a campaign, or work around the SafetyGuard. Never message anyone yourself.
 

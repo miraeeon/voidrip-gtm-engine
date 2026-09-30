@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyRoutingRules } from '../src/pipeline/route.js';
 import { lintSequence, type SequenceInput } from '../src/pipeline/sequence.js';
-import { toOverloopSteps, textToHtml } from '../src/pipeline/push.js';
+import { toOverloopSteps, textToHtml } from '../src/adapters/overloop-execution.js';
 import { splitName, dedupeKey } from '../src/pipeline/source.js';
 
 const both = { email: 'a@acme.com', linkedin_url: 'https://linkedin.com/in/a' };

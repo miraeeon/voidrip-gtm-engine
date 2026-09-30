@@ -1,8 +1,9 @@
-import { OverloopClient, type OvlProspect } from '../clients/overloop.js';
+import type { ExecutionAdapter, ExecutionProspect } from '../adapters/execution.js';
+import { createDefaultExecutionAdapter } from '../adapters/runtime.js';
 import { all, auditSink, logRun, run } from '../db/db.js';
 
-/** What Overloop already knows about a lead — used for routing and to avoid double-contacting. */
-export interface OverloopContext {
+/** What the execution provider already knows about a lead — used for routing and deduplication. */
+export interface ExecutionContext {
   exists: boolean;
   prospect_id?: number;
   email_status?: string | null;
@@ -16,7 +17,9 @@ export interface OverloopContext {
   checked_at: string;
 }
 
-export function toContext(p: OvlProspect | null): OverloopContext {
+export type OverloopContext = ExecutionContext;
+
+export function toContext(p: ExecutionProspect | null): ExecutionContext {
   const checked_at = new Date().toISOString();
   if (!p) return { exists: false, checked_at };
   return {
@@ -35,11 +38,11 @@ export function toContext(p: OvlProspect | null): OverloopContext {
 }
 
 /**
- * Read-only lookup of every not-yet-enriched lead in Overloop (by email, then LinkedIn URL).
+ * Read-only lookup of every not-yet-enriched lead (by email, then LinkedIn URL).
  * The result feeds classification (history, deliverability) and hard routing rules.
  */
-export async function enrichFromOverloop(opts: { client?: OverloopClient; limit?: number; leadIds?: number[] } = {}) {
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+export async function enrichFromExecution(opts: { execution?: ExecutionAdapter; limit?: number; leadIds?: number[] } = {}) {
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const filter = opts.leadIds?.length ? `AND id IN (${opts.leadIds.map(Number).join(',')})` : '';
   const leads = all<any>(
     `SELECT id, email, linkedin_url FROM leads WHERE status = 'new' AND ovl_context_json IS NULL ${filter} ORDER BY id LIMIT ?`,
@@ -49,9 +52,7 @@ export async function enrichFromOverloop(opts: { client?: OverloopClient; limit?
   const errors: { lead_id: number; error: string }[] = [];
   for (const l of leads) {
     try {
-      let p: OvlProspect | null = null;
-      if (l.email) p = await client.findProspectByEmail(l.email);
-      if (!p && l.linkedin_url) p = await client.findProspectByLinkedin(l.linkedin_url);
+      const p = await execution.findProspect({ email: l.email, linkedinUrl: l.linkedin_url });
       const ctx = toContext(p);
       if (ctx.exists) known++;
       run('UPDATE leads SET ovl_context_json = ? WHERE id = ?', JSON.stringify(ctx), l.id);
@@ -63,3 +64,6 @@ export async function enrichFromOverloop(opts: { client?: OverloopClient; limit?
   logRun('enrich', summary);
   return summary;
 }
+
+/** Backwards-compatible tool surface; provider selection now happens through ExecutionAdapter. */
+export const enrichFromOverloop = enrichFromExecution;

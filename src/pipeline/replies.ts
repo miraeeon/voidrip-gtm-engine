@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { OverloopClient } from '../clients/overloop.js';
+import type { ExecutionAdapter } from '../adapters/execution.js';
+import { createDefaultExecutionAdapter } from '../adapters/runtime.js';
 import { all, auditSink, logRun, nowIso, one, run } from '../db/db.js';
 import { recordOutcome } from './results.js';
 import { getSellerProfile } from './setup.js';
@@ -47,14 +48,14 @@ const POSITIVE: ReplyCategory[] = ['interested'];
 const STOP: ReplyCategory[] = ['unsubscribe', 'not_interested', 'wrong_person', 'interested', 'question', 'objection', 'referral', 'not_now'];
 
 /** Compare Overloop reply counts with what we've already seen; open a reply item for every increase. */
-export async function detectReplies(opts: { client?: OverloopClient } = {}) {
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+export async function detectReplies(opts: { execution?: ExecutionAdapter } = {}) {
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const pushes = all<any>('SELECT * FROM pushes WHERE deleted_at IS NULL AND ovl_prospect_id IS NOT NULL');
   const opened: { reply_id: number; lead_id: number; channel: string }[] = [];
   const errors: { lead_id: number; error: string }[] = [];
   for (const p of pushes) {
     try {
-      const pr = await client.getProspect(p.ovl_prospect_id);
+      const pr = await execution.getProspect(p.ovl_prospect_id);
       if (!pr.replied_at || pr.replied_at <= p.pushed_at) continue;
       for (const channel of ['email', 'linkedin'] as const) {
         const count = channel === 'email' ? pr.email_reply_count : pr.linkedin_reply_count;
@@ -163,13 +164,13 @@ export function getReplyQueue(limit = 20) {
 }
 
 /** Store the agent's triage and apply safe follow-ups. Sending the answer is always left to a human. */
-export async function saveReplyTriage(raw: unknown, opts: { client?: OverloopClient } = {}) {
+export async function saveReplyTriage(raw: unknown, opts: { execution?: ExecutionAdapter } = {}) {
   const t = ReplyTriageInput.parse(raw);
   const reply = one<any>('SELECT * FROM replies WHERE id = ?', t.reply_id);
   if (!reply) throw new Error(`unknown reply ${t.reply_id}`);
   if (!reply.text) throw new Error(`reply ${t.reply_id} has no text yet — add it with gtm_ingest_reply first`);
   const lead = one<any>('SELECT * FROM leads WHERE id = ?', reply.lead_id);
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const actions: { action: string; ok: boolean; detail?: string }[] = [];
   const simulated = !!reply.is_simulated;
 
@@ -178,7 +179,7 @@ export async function saveReplyTriage(raw: unknown, opts: { client?: OverloopCli
     if (simulated) actions.push({ action: 'exclusion_list', ok: true, detail: 'skipped (simulated reply)' });
     else {
       try {
-        await client.addToExclusionList(lead.email, 'email');
+        await execution.exclude(lead.email);
         actions.push({ action: 'exclusion_list', ok: true, detail: lead.email });
       } catch (e) {
         actions.push({ action: 'exclusion_list', ok: false, detail: (e as Error).message });
@@ -191,7 +192,7 @@ export async function saveReplyTriage(raw: unknown, opts: { client?: OverloopCli
     if (simulated) actions.push({ action: 'stop_sequence', ok: true, detail: 'skipped (simulated reply)' });
     else {
       try {
-        const n = await client.stopEnrollmentsFor(reply.ovl_campaign_id, reply.ovl_prospect_id);
+        const n = await execution.pause(reply.ovl_campaign_id, reply.ovl_prospect_id);
         actions.push({ action: 'stop_sequence', ok: true, detail: `${n} enrollment(s) removed` });
       } catch (e) {
         actions.push({ action: 'stop_sequence', ok: false, detail: (e as Error).message });
@@ -202,7 +203,7 @@ export async function saveReplyTriage(raw: unknown, opts: { client?: OverloopCli
   // 3. Hot reply → make sure a human owns the conversation in Overloop.
   if (['interested', 'question', 'objection', 'referral'].includes(t.category) && reply.ovl_prospect_id && !simulated) {
     try {
-      const assigned = await client.assignConversationForProspect(reply.ovl_prospect_id, reply.ovl_campaign_id);
+      const assigned = await execution.assignReplyOwner(reply.ovl_prospect_id, reply.ovl_campaign_id);
       actions.push({ action: 'assign_conversation', ok: !!assigned, detail: assigned ? `conversation ${assigned.conversation_id} → user ${assigned.owner_id}` : 'conversation not found in recent activity' });
     } catch (e) {
       actions.push({ action: 'assign_conversation', ok: false, detail: (e as Error).message });

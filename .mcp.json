@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "gtm-autopilot": {
+    "voidrip-gtm-engine": {
       "command": "node",
       "args": ["bin/gtm-mcp.mjs"]
     }

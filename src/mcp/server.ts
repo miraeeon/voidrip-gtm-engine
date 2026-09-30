@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * GTM Autopilot MCP server (stdio). Exposes the full Max × Overloop GTM loop as tools
- * so any MCP client — Claude Code, Claude Desktop, Codex, Cursor — can run it with
- * its own model as the brain.
+ * VOIDRIP GTM Engine MCP server (stdio). Exposes the provider-agnostic GTM loop
+ * to Codex and other MCP clients.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -11,11 +10,14 @@ import { getConfig } from '../config.js';
 import { TOOLS } from '../tools.js';
 import { getPlaybook } from '../pipeline/playbook.js';
 import { status } from '../pipeline/report.js';
+import { toolAllowedInRuntime } from '../safety/unattended.js';
 
-const INSTRUCTIONS = `GTM Autopilot: Max (yourmax.ai) finds in-market leads from buying signals; Overloop (overloop.ai) runs email + LinkedIn outreach; you are the brain in between.
+const UNATTENDED = process.env.GTM_UNATTENDED === '1';
+
+const INSTRUCTIONS = `VOIDRIP GTM Engine: SourceAdapter supplies candidates; ExecutionAdapter manages outbound drafts, activation and results. Max and Overloop are optional bundled adapters; Codex is the qualification and orchestration engine.
 Daily loop: gtm_sync_results -> gtm_get_performance -> gtm_save_learnings -> gtm_source_leads -> gtm_get_classification_queue -> gtm_save_classifications -> gtm_get_drafting_queue -> gtm_save_sequence (draft, critique, final) -> gtm_push_to_overloop -> gtm_verify_overloop -> gtm_write_report.
 Rules: the lead's buying signal is the hook of the first touch; every message must be specific to one person; never invent facts; no signatures (Overloop adds them).
-Safety: SEND_MODE=${safeMode()} — in locked mode campaigns are inert drafts and enrollment is blocked in code. Never try to work around the SafetyGuard.`;
+Safety: SEND_MODE=${safeMode()} — in locked mode campaigns are inert drafts and enrollment is blocked in code. Never try to work around the SafetyGuard.${UNATTENDED ? ' This is an unattended run: approval, launch, cleanup, simulations and source-control mutations are not exposed.' : ''}`;
 
 function safeMode() {
   try {
@@ -25,9 +27,9 @@ function safeMode() {
   }
 }
 
-const server = new McpServer({ name: 'gtm-autopilot', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+const server = new McpServer({ name: 'voidrip-gtm-engine', version: '0.2.0' }, { instructions: INSTRUCTIONS });
 
-for (const tool of TOOLS) {
+for (const tool of TOOLS.filter((candidate) => toolAllowedInRuntime(candidate.name, UNATTENDED))) {
   server.registerTool(
     tool.name,
     {
@@ -66,7 +68,7 @@ server.registerPrompt(
         content: {
           type: 'text' as const,
           text:
-            'Run today’s GTM Autopilot loop end to end using the gtm_* tools, following the server instructions. ' +
+            'Run today’s VOIDRIP GTM loop end to end using the gtm_* tools, following the server instructions. ' +
             'Classify and route every new lead, write a lead-specific sequence for each (draft, self-critique, then final), push to Overloop, verify everything is inert, and write the daily brief. Summarize what you did and what you learned.',
         },
       },

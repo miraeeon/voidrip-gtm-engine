@@ -21,11 +21,13 @@ const dayList = z
 const EnvSchema = z.object({
   // --- platform credentials ---
   MAX_API_KEY: z
-    .string({ error: 'MAX_API_KEY missing — get it in Max: Settings → API Keys (run `npm run setup`)' })
-    .min(10, 'MAX_API_KEY looks too short — check the value in .env'),
+    .string()
+    .min(10, 'MAX_API_KEY looks too short — check the value in .env')
+    .optional(),
   OVERLOOP_API_KEY: z
-    .string({ error: 'OVERLOOP_API_KEY missing — get it in Overloop: Settings → API Keys (run `npm run setup`)' })
-    .min(10, 'OVERLOOP_API_KEY looks too short — check the value in .env'),
+    .string()
+    .min(10, 'OVERLOOP_API_KEY looks too short — check the value in .env')
+    .optional(),
   MAX_BUSINESS_ID: z.coerce.number().int().min(0).default(0).describe('0 = not chosen yet (run npm run setup)'),
   MAX_API_URL: z.string().url().default('https://api.yourmax.ai/api/v1'),
   OVERLOOP_API_URL: z.string().url().default('https://api.overloop.ai/public/v2'),
@@ -52,8 +54,8 @@ const EnvSchema = z.object({
   GTM_SCHEDULE_ENABLED: bool.default(true),
   GTM_SCHEDULE_TIME: hhmm.default('08:00'),
   GTM_SCHEDULE_DAYS: dayList.default(['MON', 'TUE', 'WED', 'THU', 'FRI']),
-  GTM_AGENT_CMD: z.string().default('claude').describe('agent CLI used by the daily runner'),
-  GTM_MODEL: z.string().default('claude-opus-5-5'),
+  GTM_AGENT_CMD: z.string().default('codex').describe('Codex CLI command used by the daily runner'),
+  GTM_MODEL: z.string().default('').describe('optional Codex model override; empty uses the configured default'),
   GTM_RUN_TIMEOUT_MIN: z.coerce.number().int().min(5).max(600).default(90),
   GTM_LOOP_NOTE: z.string().default('').describe('extra instructions appended to every daily run'),
 

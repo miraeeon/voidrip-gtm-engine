@@ -10,11 +10,11 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { ENV_FILE, reloadConfig, ROOT } from './config.js';
-import { MaxClient } from './clients/max.js';
-import { OverloopClient } from './clients/overloop.js';
+import { MaxSourceAdapter } from './adapters/max-source.js';
+import { OverloopExecutionAdapter } from './adapters/overloop-execution.js';
 import { getDb } from './db/db.js';
 import { getPlaybook } from './pipeline/playbook.js';
-import { getSellerProfile, setSellerProfile, syncSellerFromMax, writeEnvVar } from './pipeline/setup.js';
+import { getSellerProfile, setSellerProfile, syncSellerFromSource, writeEnvVar } from './pipeline/setup.js';
 import { scheduleInstall, systemChecks } from './ops.js';
 
 const c = { g: (s: string) => `\x1b[32m${s}\x1b[0m`, y: (s: string) => `\x1b[33m${s}\x1b[0m`, r: (s: string) => `\x1b[31m${s}\x1b[0m`, b: (s: string) => `\x1b[1m${s}\x1b[0m`, d: (s: string) => `\x1b[2m${s}\x1b[0m` };
@@ -30,7 +30,7 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
   const step = (n: number, t: string) => console.log(`\n${c.b(`${n}. ${t}`)}`);
 
   try {
-    console.log(c.b('\n🛰️  GTM Autopilot setup') + c.d(`  (${ROOT})`));
+    console.log(c.b('\n🛰️  VOIDRIP GTM Engine setup') + c.d(`  (${ROOT})`));
 
     step(1, 'Node.js');
     const [maj, min] = process.versions.node.split('.').map(Number);
@@ -54,15 +54,15 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
     process.env.MAX_API_KEY = maxKey;
     process.env.OVERLOOP_API_KEY = ovlKey;
     reloadConfig();
-    const max = new MaxClient({ apiKey: maxKey });
-    const businesses = await max.listBusinesses().catch((e) => {
+    const source = MaxSourceAdapter.fromApiKey(maxKey);
+    const businesses = await source.listBusinesses().catch((e) => {
       throw new Error(`Max key rejected: ${(e as Error).message}`);
     });
     console.log(c.g(`✔ Max key works (${businesses.length} business${businesses.length === 1 ? '' : 'es'})`));
-    const me = await new OverloopClient({ apiKey: ovlKey }).me().catch((e) => {
+    const account = await OverloopExecutionAdapter.fromApiKey(ovlKey).getAccount().catch((e) => {
       throw new Error(`Overloop key rejected: ${(e as Error).message} (Overloop expects the raw key, no "Bearer")`);
     });
-    console.log(c.g(`✔ Overloop key works (${me.name} <${me.email}>)`));
+    console.log(c.g(`✔ Overloop key works (${account.user.name} <${account.user.email}>)`));
 
     step(4, 'Your company in Max');
     businesses.forEach((b) => console.log(`   ${String(b.id).padStart(5)}  ${b.name}  ${c.d(b.website ?? '')}`));
@@ -79,12 +79,12 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
       }
       const url = `https://${host}`;
       console.log(c.d('   Max is analysing your website and building your ICP…'));
-      businessId = (await max.createBusiness({ website: url })).id;
+      businessId = (await source.createBusiness({ website: url })).id;
     }
     writeEnvVar('MAX_BUSINESS_ID', String(businessId), ENV_FILE);
     process.env.MAX_BUSINESS_ID = String(businessId);
     reloadConfig();
-    const subs = await max.listSubscriptions(businessId);
+    const subs = await source.listSubscriptions(businessId);
     console.log(c.g(`✔ business #${businessId} · ${subs.filter((s) => s.active).length}/${subs.length} signal subscriptions active`));
     if (!subs.some((s) => s.active)) console.log(c.y('   ⚠ no active signals yet — add some with `gtm setup` + `gtm subscribe <signal>` (needs an active Max plan)'));
 
@@ -94,7 +94,7 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
     console.log(c.g(`✔ ${reloadConfig().GTM_DB_PATH} ready (${tables} tables, playbook v${getPlaybook().version})`));
 
     step(6, 'Seller profile (what the agent may say about you)');
-    const seller = await syncSellerFromMax({ businessId, max });
+    const seller = await syncSellerFromSource({ businessId, source });
     console.log(c.d(`   ${seller.company} — ${seller.description ?? ''}`));
     const existing = getSellerProfile();
     const vp = await ask('Value proposition (one or two sentences)', existing?.value_proposition ?? '');
@@ -128,10 +128,10 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
 
     step(9, 'Health check');
     const sys = systemChecks();
-    console.log(`   node ${sys.node.ok ? c.g('ok') : c.r('too old')} · database ${sys.database.ok ? c.g('ok') : c.r('missing tables')} · agent CLI "${sys.agent_cli.cmd}" ${sys.agent_cli.ok ? c.g(sys.agent_cli.version ?? 'ok') : c.y('not found — install Claude Code (https://claude.com/claude-code) or set GTM_AGENT_CMD')}`);
+    console.log(`   node ${sys.node.ok ? c.g('ok') : c.r('too old')} · database ${sys.database.ok ? c.g('ok') : c.r('missing tables')} · agent CLI "${sys.agent_cli.cmd}" ${sys.agent_cli.ok ? c.g(sys.agent_cli.version ?? 'ok') : c.y('not found — install Codex or set GTM_AGENT_CMD')}`);
 
     console.log(`\n${c.b('Done. Next:')}
-  • Open this folder in ${c.b('Claude Code')} and type ${c.b('/gtm-daily-loop')} — or run ${c.b('npm run daily')} for an unattended run
+  • Open this folder in ${c.b('Codex')} and ask it to use ${c.b('gtm-daily-loop')} — or run ${c.b('npm run daily')} for an unattended run
   • Review drafts:  ${c.b('node bin/gtm.mjs review')}      Replies:  ${c.b('node bin/gtm.mjs replies')}
   • Health:        ${c.b('node bin/gtm.mjs doctor')}      Docs: docs/GETTING_STARTED.md
   • Sending stays ${c.b('locked')} until you set SEND_MODE=live and approve + launch campaigns yourself.\n`);

@@ -1,4 +1,5 @@
-import { OverloopClient } from '../clients/overloop.js';
+import type { ExecutionAdapter } from '../adapters/execution.js';
+import { createDefaultExecutionAdapter } from '../adapters/runtime.js';
 import { all, auditSink, logRun, nowIso, one, run, tx } from '../db/db.js';
 
 const after = (ts: string | null | undefined, since: string) => !!ts && ts > since;
@@ -8,8 +9,8 @@ const after = (ts: string | null | undefined, since: string) => !!ts && ts > sin
  * our push counts — prospects that already existed in Overloop may carry history
  * from other campaigns.
  */
-export async function syncResults(opts: { client?: OverloopClient } = {}) {
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+export async function syncResults(opts: { execution?: ExecutionAdapter } = {}) {
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const pushes = all<any>('SELECT * FROM pushes WHERE deleted_at IS NULL AND ovl_prospect_id IS NOT NULL');
   let updated = 0;
   const errors: { lead_id: number; error: string }[] = [];
@@ -17,13 +18,13 @@ export async function syncResults(opts: { client?: OverloopClient } = {}) {
     const existing = one<any>('SELECT * FROM outcomes WHERE lead_id = ?', p.lead_id);
     if (existing?.is_simulated) continue; // don't overwrite a simulation with real zeros in test mode
     try {
-      const pr = await client.getProspect(p.ovl_prospect_id);
+      const pr = await execution.getProspect(p.ovl_prospect_id);
       const since = p.pushed_at as string;
       const replied = after(pr.replied_at, since);
       const row = {
         sent: after(pr.last_emailed_at, since) ? 1 : 0,
         opened: after(pr.opened_at, since) ? 1 : 0,
-        clicked: pr.clicked && after((pr as any).clicked_at, since) ? 1 : 0,
+        clicked: pr.clicked && after(pr.clicked_at, since) ? 1 : 0,
         replied: replied ? 1 : 0,
         email_replies: replied ? pr.email_reply_count : 0,
         linkedin_replies: replied ? pr.linkedin_reply_count : 0,

@@ -7,12 +7,14 @@ All settings live in `.env` at the repo root (or the file named by `GTM_ENV_FILE
 
 Changes take effect on the next command, with one exception: **schedule** changes need `npm run schedule` to be re-registered with the OS.
 
-## Platform credentials
+## Bundled adapter credentials
+
+The engine, SQLite store and MCP server start without provider credentials. These values become required only when the corresponding bundled adapter is invoked.
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAX_API_KEY` | **required** | Max API key (*Settings → API Keys*). Sent as `Authorization: Bearer …` |
-| `OVERLOOP_API_KEY` | **required** | Overloop API key (*Settings → API Keys*). Sent raw in `Authorization` |
+| `MAX_API_KEY` | – | Required by the bundled Max `SourceAdapter`. Sent as `Authorization: Bearer …` |
+| `OVERLOOP_API_KEY` | – | Required by the bundled Overloop `ExecutionAdapter`. Sent raw in `Authorization` |
 | `MAX_BUSINESS_ID` | set by setup | The Max business (your company) the loop runs for |
 | `MAX_API_URL` | `https://api.yourmax.ai/api/v1` | Override only for testing |
 | `OVERLOOP_API_URL` | `https://api.overloop.ai/public/v2` | Override only for testing |
@@ -55,12 +57,12 @@ A good ramp while you're testing: 10 → 25 → 50 pushes per day. Watch deliver
 | `GTM_SCHEDULE_ENABLED` | `true` | Informational; `npm run schedule` / `unschedule` actually add or remove it |
 | `GTM_SCHEDULE_TIME` | `08:00` | Local time of the daily run (HH:MM) |
 | `GTM_SCHEDULE_DAYS` | `MON,TUE,WED,THU,FRI` | Days of the daily run |
-| `GTM_AGENT_CMD` | `claude` | Agent CLI the runner starts. `claude` (Claude Code) or `codex` |
-| `GTM_MODEL` | `claude-opus-5-5` | Model for unattended runs |
+| `GTM_AGENT_CMD` | `codex` | Codex CLI command started by the runner |
+| `GTM_MODEL` | – | Optional Codex model override; empty uses the configured Codex default |
 | `GTM_RUN_TIMEOUT_MIN` | `90` | A run taking longer than this is stopped |
 | `GTM_LOOP_NOTE` | – | Extra instructions for every run, e.g. `Only tier A and B today.` |
 
-The scheduler entry is unique per checkout (`GTM Autopilot daily loop - <folder>` on Windows; a tagged cron line on macOS/Linux). That lets several clones run side by side.
+The scheduler entry is unique per checkout (`VOIDRIP GTM daily loop - <folder>` on Windows; a tagged cron line on macOS/Linux). That lets several clones run side by side. Scheduled Codex runs use a read-only shell sandbox and set `GTM_UNATTENDED=1`, which removes approval, launch, cleanup, simulation and source-configuration mutation tools from the MCP server.
 
 ## Storage and housekeeping
 
@@ -79,7 +81,7 @@ The scheduler entry is unique per checkout (`GTM Autopilot daily loop - <folder>
 |---|---|
 | `data/playbook.md` | Tiering, routing, writing rules, signal sensitivity. Reload with `gtm playbook --reload`. The learning step also versions it |
 | Seller profile (`gtm seller --set`) | Value proposition, proof points, CTA, tone, language, do-not-say |
-| `.claude/skills/*/SKILL.md` | How the agent runs each stage (daily loop, classify, write, replies, learn) |
-| `.claude/settings.json` | Which tools Claude Code may use without asking (approve / launch / cleanup always ask) |
+| `.agents/skills/*/SKILL.md` | Codex workflows for the daily loop, qualification, writing, replies and learning |
+| `src/safety/unattended.ts` | Tools omitted from unattended MCP sessions |
 | `src/pipeline/sequence.ts` → `lintSequence` | Lint rules: length, spam words, clichés, claims, channel plan |
 | `src/pipeline/route.ts` | Hard routing rules |

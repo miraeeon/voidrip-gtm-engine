@@ -51,7 +51,7 @@ export function buildReport(date = today()) {
   const pb = getPlaybook();
 
   const L: string[] = [];
-  L.push(`# GTM Autopilot — daily brief ${date}`, '');
+  L.push(`# VOIDRIP GTM Engine — daily brief ${date}`, '');
   L.push(`**Business:** #${cfg.MAX_BUSINESS_ID} · **Send mode:** \`${cfg.SEND_MODE}\` · **Playbook:** v${pb.version}`, '');
   if (cfg.SEND_MODE === 'locked') L.push('> 🔒 Locked mode — campaigns are inert drafts in Overloop. No one was enrolled or messaged.', '');
 
@@ -63,7 +63,7 @@ export function buildReport(date = today()) {
     L.push('');
   }
 
-  L.push('## 2. Classification & routing (Claude)', '');
+  L.push('## 2. Classification & routing (Codex)', '');
   if (classified.length === 0) L.push('_Nothing classified today._', '');
   else {
     L.push('| Tier | Route | Opens on | Leads |', '|---|---|---|---|');

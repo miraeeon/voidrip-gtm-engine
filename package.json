@@ -1,7 +1,7 @@
 {
-  "name": "gtm-autopilot",
+  "name": "voidrip-gtm-engine",
   "version": "1.0.0",
-  "description": "Agent-native end-to-end GTM loop: Max (yourmax.ai) signal leads -> Claude classification, routing & sequences -> Overloop email + LinkedIn -> replies -> learning loop.",
+  "description": "VOIDRIP agent-native GTM engine with source and execution adapters, Codex qualification, locked activation, results and learning.",
   "private": true,
   "type": "module",
   "bin": {

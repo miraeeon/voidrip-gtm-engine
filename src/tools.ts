@@ -1,12 +1,9 @@
 /**
  * One registry of GTM tools shared by the MCP server and the CLI. The engine is
- * deterministic; the intelligence (classification, routing, writing, learning)
- * comes from whichever agent calls these tools — Claude Code, Codex, Claude
- * Desktop, Cursor, …
+ * deterministic; Codex supplies classification, routing, writing and learning.
  */
 import { z } from 'zod';
 import { businessId as configuredBusinessId, getConfig } from './config.js';
-import { MaxClient } from './clients/max.js';
 import { getPerformance } from './pipeline/analytics.js';
 import { systemChecks } from './ops.js';
 import { enrichFromOverloop } from './pipeline/enrich.js';
@@ -18,8 +15,8 @@ import { detectReplies, getReplyQueue, ingestReply, replyInbox, ReplyTriageInput
 import { recordOutcome, simulateResults, syncResults } from './pipeline/results.js';
 import { status, writeReport } from './pipeline/report.js';
 import { getDraftingQueue, SequenceInput, saveSequence } from './pipeline/sequence.js';
-import { doctor, getSellerProfile, init, SellerProfile, setSellerProfile, syncSellerFromMax } from './pipeline/setup.js';
-import { ensureSubscription, getSetup, pauseSubscription, sourceLeads } from './pipeline/source.js';
+import { doctor, getSellerProfile, init, SellerProfile, setSellerProfile, syncSellerFromSource } from './pipeline/setup.js';
+import { ensureSubscription, getSetup, pauseSubscription, resumeSubscription, sourceLeads, updateIcp } from './pipeline/source.js';
 
 export interface ToolDef<S extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
@@ -87,8 +84,8 @@ export const TOOLS: ToolDef[] = [
         .describe('ICP patch'),
     },
     handler: async (a) => {
-      const biz = await new MaxClient().updateIcp(configuredBusinessId(), a.icp);
-      await syncSellerFromMax();
+      const biz = await updateIcp(a.icp, { businessId: configuredBusinessId() });
+      await syncSellerFromSource();
       return biz.ideal_customer_profile;
     },
   }),
@@ -111,8 +108,7 @@ export const TOOLS: ToolDef[] = [
       }
       if (!a.subscription_id) throw new Error('subscription_id required');
       if (a.action === 'pause') return pauseSubscription(a.subscription_id);
-      await new MaxClient().resumeSubscription(configuredBusinessId(), a.subscription_id);
-      return { action: 'resumed', id: a.subscription_id };
+      return resumeSubscription(a.subscription_id, { businessId: configuredBusinessId() });
     },
   }),
   def({

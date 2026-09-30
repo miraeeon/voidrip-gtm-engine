@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * gtm — CLI for GTM Autopilot. Every command prints JSON (pipe to jq) except `report`.
+ * gtm — CLI for VOIDRIP GTM Engine. Every command prints JSON (pipe to jq) except `report`.
  * `gtm tool <name> '<json>'` calls any tool exactly as an MCP client would.
  */
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ import { runWizard } from './wizard.js';
 
 const program = new Command()
   .name('gtm')
-  .description('GTM Autopilot — Max signal leads × Overloop outreach × your AI agent')
+  .description('VOIDRIP GTM Engine — source adapters × Codex × execution adapters')
   .version('0.1.0');
 
 const print = (x: unknown) => console.log(typeof x === 'string' ? x : JSON.stringify(x, null, 2));

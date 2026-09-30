@@ -11,7 +11,10 @@ import { saveSequence } from '../src/pipeline/sequence.js';
 import { sourceLeads } from '../src/pipeline/source.js';
 import { MaxClient } from '../src/clients/max.js';
 import { OverloopClient } from '../src/clients/overloop.js';
+import { MaxSourceAdapter } from '../src/adapters/max-source.js';
+import { OverloopExecutionAdapter } from '../src/adapters/overloop-execution.js';
 import { fakeFetch, freshEnv, maxLead } from './helpers.js';
+import { toolAllowedInRuntime, UNATTENDED_TOOL_NAMES } from '../src/safety/unattended.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gtm-'));
 
@@ -33,7 +36,10 @@ describe('config', () => {
     expect(c.SEND_MODE).toBe('locked');
     expect(toMinutes(c.OVERLOOP_SEND_START)).toBe(495);
     expect(() => parseConfig({ ...env, GTM_SCHEDULE_TIME: '25:00' })).toThrow(/HH:MM/);
-    expect(() => parseConfig({ ...env, MAX_API_KEY: '' })).toThrow(/MAX_API_KEY missing/);
+    expect(parseConfig({}).MAX_API_KEY).toBeUndefined();
+    expect(parseConfig({}).GTM_AGENT_CMD).toBe('codex');
+    expect(parseConfig({}).GTM_MODEL).toBe('');
+    expect(() => parseConfig({ ...env, MAX_API_KEY: 'short' })).toThrow(/looks too short/);
   });
 });
 
@@ -45,18 +51,30 @@ describe('ops', () => {
     const line = cronLine(getConfig());
     expect(line.startsWith('5 7 * * 1,5,0 ')).toBe(true);
     expect(line).toContain('bin/gtm.mjs daily');
-    expect(line).toContain('# gtm-autopilot:');
+    expect(line).toContain('# voidrip-gtm-engine:');
   });
 
   it('agent invocation never allows approve/launch on unattended runs', () => {
+    setConfigForTests({ GTM_AGENT_CMD: 'legacy-agent', GTM_MODEL: 'legacy-model' });
     const inv = buildAgentInvocation(getConfig(), 'extra');
-    for (const t of ['mcp__gtm-autopilot__gtm_approve', 'mcp__gtm-autopilot__gtm_launch']) {
+    for (const t of ['mcp__voidrip-gtm-engine__gtm_approve', 'mcp__voidrip-gtm-engine__gtm_launch']) {
       expect(UNATTENDED_DENY).toContain(t);
       expect(inv.args).toContain(t);
     }
-    expect(inv.prompt).toMatch(/^\/gtm-daily-loop .*unattended.*extra$/);
+    expect(inv.prompt).toMatch(/^Use the gtm-daily-loop skill\. .*unattended.*extra$/);
     setConfigForTests({ GTM_AGENT_CMD: 'codex' });
-    expect(buildAgentInvocation(getConfig()).args[0]).toBe('exec');
+    expect(buildAgentInvocation(getConfig()).args).toEqual(['exec', '--sandbox', 'read-only', '-']);
+    setConfigForTests({ GTM_AGENT_CMD: 'codex', GTM_MODEL: 'gpt-test' });
+    expect(buildAgentInvocation(getConfig()).args).toEqual(['exec', '--sandbox', 'read-only', '--model', 'gpt-test', '-']);
+  });
+
+  it('removes sensitive tools from unattended MCP runtimes', () => {
+    for (const name of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop']) {
+      expect(UNATTENDED_TOOL_NAMES).toContain(name);
+      expect(toolAllowedInRuntime(name, true)).toBe(false);
+      expect(toolAllowedInRuntime(name, false)).toBe(true);
+    }
+    expect(toolAllowedInRuntime('gtm_status', true)).toBe(true);
   });
 
   it('lock is exclusive and released', () => {
@@ -88,7 +106,7 @@ describe('daily caps + sending window', () => {
   it('caps classification + drafting per day and applies the sending window', async () => {
     const leads = [maxLead(1), maxLead(2), maxLead(3), maxLead(4)];
     const mf = fakeFetch({ 'GET /leads': () => ({ leads, meta: { current_page: 1, total_pages: 1, total_count: 4, per_page: 100 } }) });
-    await sourceLeads({ max: new MaxClient({ fetchImpl: mf.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' }), businessId: 143 });
+    await sourceLeads({ source: new MaxSourceAdapter(new MaxClient({ fetchImpl: mf.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' })), businessId: 143 });
     expect(getClassificationQueue(10).leads.length).toBe(2);
     saveClassifications([1, 2].map((id) => ({ lead_id: id, tier: 'A' as const, persona: 'cmo', intent_strength: 5, route: 'email' as const, angle: 'speed', reasoning: 'Strong signal and fit.' })));
     const q = getClassificationQueue(10);
@@ -106,7 +124,7 @@ describe('daily caps + sending window', () => {
     expect(getDraftingQueue(10).daily_cap.reached).toBe(true);
 
     const of = fakeFetch({ 'GET /prospects': () => ({ data: [], pagination: {} }), 'POST /prospects': () => ({ data: { id: 9 } }), 'POST /campaigns': (b) => ({ data: { id: 10, ...b } }) });
-    await pushToOverloop({ client: new OverloopClient({ fetchImpl: of.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k' }) });
+    await pushToOverloop({ execution: new OverloopExecutionAdapter(new OverloopClient({ fetchImpl: of.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k' })) });
     const body = of.calls.find((c) => c.url.endsWith('/campaigns'))!.body;
     expect(body.sending_days).toEqual(['tuesday', 'thursday']);
     expect(body.start_sending_minutes).toBe(600);

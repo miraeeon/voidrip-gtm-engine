@@ -10,20 +10,21 @@ import { getDb, logRun, nowIso, one } from './db/db.js';
 import { writeReport } from './pipeline/report.js';
 
 // One schedule per checkout, so several clones (e.g. one per client) never overwrite each other.
-export const TASK_NAME = `GTM Autopilot daily loop - ${path.basename(ROOT).replace(/[^\w .-]/g, '_')}`;
-const CRON_MARK = `# gtm-autopilot:${ROOT}`;
+export const TASK_NAME = `VOIDRIP GTM daily loop - ${path.basename(ROOT).replace(/[^\w .-]/g, '_')}`;
+const CRON_MARK = `# voidrip-gtm-engine:${ROOT}`;
+const LEGACY_CRON_MARK = `# gtm-autopilot:${ROOT}`;
 const MIN_NODE = [22, 13];
 
 /** Tools an unattended run may never call — enforced on the agent command line. */
 export const UNATTENDED_DENY = [
-  'mcp__gtm-autopilot__gtm_approve',
-  'mcp__gtm-autopilot__gtm_launch',
-  'mcp__gtm-autopilot__gtm_cleanup_overloop',
-  'mcp__gtm-autopilot__gtm_simulate_results',
-  'mcp__gtm-autopilot__gtm_simulate_replies',
-  'mcp__gtm-autopilot__gtm_manage_subscription',
-  'mcp__gtm-autopilot__gtm_update_icp',
-  'mcp__gtm-autopilot__gtm_init',
+  'mcp__voidrip-gtm-engine__gtm_approve',
+  'mcp__voidrip-gtm-engine__gtm_launch',
+  'mcp__voidrip-gtm-engine__gtm_cleanup_overloop',
+  'mcp__voidrip-gtm-engine__gtm_simulate_results',
+  'mcp__voidrip-gtm-engine__gtm_simulate_replies',
+  'mcp__voidrip-gtm-engine__gtm_manage_subscription',
+  'mcp__voidrip-gtm-engine__gtm_update_icp',
+  'mcp__voidrip-gtm-engine__gtm_init',
   'Bash',
   'PowerShell',
   'Write',
@@ -104,7 +105,7 @@ export function releaseLock(cfg: Config = getConfig()): void {
 
 export function buildAgentInvocation(cfg: Config, note = '') {
   const prompt = [
-    '/gtm-daily-loop',
+    'Use the gtm-daily-loop skill.',
     'This is an unattended scheduled run: do not ask questions, do not approve or launch anything, and finish with the daily brief.',
     cfg.GTM_LOOP_NOTE,
     note,
@@ -113,8 +114,9 @@ export function buildAgentInvocation(cfg: Config, note = '') {
     .join(' ');
   const bin = path.basename(cfg.GTM_AGENT_CMD).toLowerCase();
   if (bin.startsWith('codex')) {
-    // Codex: non-interactive exec; its MCP config must include gtm-autopilot (see AGENTS.md).
-    return { cmd: cfg.GTM_AGENT_CMD, args: ['exec', '--model', cfg.GTM_MODEL, '-'], prompt };
+    // Codex runs read-only; GTM_UNATTENDED also removes sensitive MCP tools server-side.
+    const modelArgs = cfg.GTM_MODEL ? ['--model', cfg.GTM_MODEL] : [];
+    return { cmd: cfg.GTM_AGENT_CMD, args: ['exec', '--sandbox', 'read-only', ...modelArgs, '-'], prompt };
   }
   return {
     cmd: cfg.GTM_AGENT_CMD,
@@ -123,7 +125,7 @@ export function buildAgentInvocation(cfg: Config, note = '') {
       '--model',
       cfg.GTM_MODEL,
       '--allowedTools',
-      'mcp__gtm-autopilot__*',
+      'mcp__voidrip-gtm-engine__*',
       'Read',
       'Skill',
       'Agent',
@@ -154,7 +156,12 @@ export async function runDaily(opts: { note?: string; dryRun?: boolean } = {}) {
     }
     const exitCode = await new Promise<number>((resolve) => {
       const rc = resolveCommand(inv.cmd, inv.args);
-      const child = spawn(rc.file, rc.args, { cwd: ROOT, shell: rc.shell, env: process.env, windowsHide: true });
+      const child = spawn(rc.file, rc.args, {
+        cwd: ROOT,
+        shell: rc.shell,
+        env: { ...process.env, GTM_UNATTENDED: '1' },
+        windowsHide: true,
+      });
       const timer = setTimeout(() => {
         say(`timeout after ${cfg.GTM_RUN_TIMEOUT_MIN} min — stopping agent`);
         child.kill();
@@ -209,7 +216,9 @@ export function scheduleInstall(cfg: Config = getConfig()) {
   }
   const current = run('crontab', ['-l']);
   if (current.missing) throw new Error('crontab not found — install cron, or schedule `node bin/gtm.mjs daily` with your own scheduler');
-  const kept = (current.ok ? current.out : '').split('\n').filter((l) => l && !l.includes(CRON_MARK));
+  const kept = (current.ok ? current.out : '')
+    .split('\n')
+    .filter((l) => l && !l.includes(CRON_MARK) && !l.includes(LEGACY_CRON_MARK));
   const line = cronLine(cfg);
   const w = run('crontab', ['-'], [...kept, line, ''].join('\n'));
   if (!w.ok) throw new Error(`crontab update failed: ${w.out}`);
@@ -224,7 +233,7 @@ export function scheduleRemove() {
   const current = run('crontab', ['-l']);
   if (!current.ok) return { removed: false, detail: 'no crontab' };
   const lines = current.out.split('\n');
-  const kept = lines.filter((l) => l && !l.includes(CRON_MARK));
+  const kept = lines.filter((l) => l && !l.includes(CRON_MARK) && !l.includes(LEGACY_CRON_MARK));
   run('crontab', ['-'], [...kept, ''].join('\n'));
   return { removed: kept.length !== lines.filter(Boolean).length };
 }

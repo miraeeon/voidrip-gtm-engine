@@ -5,13 +5,30 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const transport = new StdioClientTransport({ command: process.execPath, args: [path.join(root, 'bin', 'gtm-mcp.mjs')], cwd: root });
-const client = new Client({ name: 'smoke', version: '0.0.1' });
-await client.connect(transport);
-const { tools } = await client.listTools();
-console.log(`tools (${tools.length}):`, tools.map((t) => t.name).join(', '));
-const res = await client.callTool({ name: 'gtm_status', arguments: {} });
-console.log('gtm_status ->', res.content[0].text.slice(0, 300));
-const prompts = await client.listPrompts();
-console.log('prompts:', prompts.prompts.map((p) => p.name).join(', '));
-await client.close();
+const baseEnv = Object.fromEntries(Object.entries(process.env).filter((entry) => entry[1] !== undefined));
+
+async function inspectServer(name, env) {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [path.join(root, 'bin', 'gtm-mcp.mjs')],
+    cwd: root,
+    env,
+  });
+  const client = new Client({ name: `smoke-${name}`, version: '0.0.1' });
+  await client.connect(transport);
+  const { tools } = await client.listTools();
+  const names = tools.map((tool) => tool.name);
+  console.log(`${name} tools (${names.length}):`, names.join(', '));
+  const res = await client.callTool({ name: 'gtm_status', arguments: {} });
+  console.log(`${name} gtm_status ->`, res.content[0].text.slice(0, 300));
+  const prompts = await client.listPrompts();
+  console.log(`${name} prompts:`, prompts.prompts.map((prompt) => prompt.name).join(', '));
+  await client.close();
+  return names;
+}
+
+await inspectServer('interactive', baseEnv);
+const unattended = await inspectServer('unattended', { ...baseEnv, GTM_UNATTENDED: '1' });
+for (const denied of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop', 'gtm_manage_subscription', 'gtm_update_icp', 'gtm_init']) {
+  if (unattended.includes(denied)) throw new Error(`unattended server exposed ${denied}`);
+}

@@ -16,7 +16,7 @@ const ChannelTrack = z.object({
     .describe('what THIS channel should say for this lead (e.g. "email: signal hook + 48h shortlist offer + proof point"; "LinkedIn: no-pitch connect referencing their post, then a question")'),
 });
 
-/** Claude's per-lead decision of which channel says what. */
+/** Codex's per-candidate decision of which channel says what. */
 export const ChannelPlan = z.object({
   first_channel: Channel.describe('channel that carries the first real message'),
   email: ChannelTrack,

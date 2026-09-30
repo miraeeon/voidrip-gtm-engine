@@ -1,4 +1,5 @@
 import { getConfig } from '../config.js';
+import { normalizeLinkedinUrl } from '../identity/linkedin.js';
 import { SendGuard, type AuditSink, type GuardContext } from '../safety/guard.js';
 import { HttpClient, type FetchLike } from './http.js';
 
@@ -67,10 +68,12 @@ export class OverloopClient {
 
   constructor(opts: { apiKey?: string; baseUrl?: string; fetchImpl?: FetchLike; audit?: AuditSink; guard?: SendGuard } = {}) {
     const cfg = getConfig();
+    const apiKey = opts.apiKey ?? cfg.OVERLOOP_API_KEY;
+    if (!apiKey) throw new Error('Overloop adapter is not configured — set OVERLOOP_API_KEY or use another ExecutionAdapter');
     this.http = new HttpClient({
       service: 'Overloop',
       baseUrl: opts.baseUrl ?? cfg.OVERLOOP_API_URL,
-      headers: { Authorization: opts.apiKey ?? cfg.OVERLOOP_API_KEY },
+      headers: { Authorization: apiKey },
       perMinute: 500,
       fetchImpl: opts.fetchImpl,
     });
@@ -129,7 +132,7 @@ export class OverloopClient {
     const r = await this.http.get<ListResp<OvlProspect>>('/prospects', { filter: { linkedin_profile: url }, per_page: 1 });
     const hit = r.data[0];
     // Guard against the API ignoring an unknown filter and returning an arbitrary prospect.
-    return hit && normLinkedin(hit.linkedin_profile) === normLinkedin(url) ? hit : null;
+    return hit && normalizeLinkedinUrl(hit.linkedin_profile) === normalizeLinkedinUrl(url) ? hit : null;
   }
   listConversations(query: Record<string, unknown> = {}) {
     return this.http.get<ListResp<{ id: number; name: string; prospect_ids: number[]; last_activity_at: string; created_from: string }>>(
@@ -210,10 +213,5 @@ export class OverloopClient {
 }
 
 export function normLinkedin(url: string | null | undefined): string {
-  if (!url) return '';
-  return url
-    .toLowerCase()
-    .replace(/^https?:\/\/(www\.)?/, '')
-    .replace(/\?.*$/, '')
-    .replace(/\/+$/, '');
+  return normalizeLinkedinUrl(url);
 }
