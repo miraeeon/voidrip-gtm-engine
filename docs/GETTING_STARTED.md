@@ -3,9 +3,9 @@
 This guide takes you from nothing to a working, scheduled GTM loop on your own machine. It takes about 15 minutes. Every command is shown for **Windows (PowerShell)** and **macOS / Linux (bash)** where they differ.
 
 > **What you'll have at the end:**
-> - A local copy of GTM Autopilot with its own database.
+> - A local copy of VOIDRIP GTM Engine with its own database.
 > - Your company onboarded in Max.
-> - Claude Code connected through MCP.
+> - Codex connected to the local MCP server.
 > - The first batch of lead-specific sequences drafted into Overloop, still switched off and waiting for your review.
 > - A weekday schedule that repeats all of this every morning.
 
@@ -21,18 +21,19 @@ This guide takes you from nothing to a working, scheduled GTM loop on your own m
 | **Max API key** | | Max → *Settings → API Keys* |
 | **Overloop account** ([overloop.com](https://overloop.com)) with at least one connected sending address | Runs the email + LinkedIn outreach | Overloop → *Settings → Sending addresses* |
 | **Overloop API key** | | Overloop → *Settings → API Keys* |
-| **Claude Code** (recommended) or another MCP-capable agent | The brain: classification, routing, writing, reply triage, learning | `npm i -g @anthropic-ai/claude-code`, then run `claude` once to log in |
+| **Codex CLI** | The brain: qualification, routing, writing, reply triage and learning | Install Codex, then run `codex` once to log in |
 
-You do **not** need an Anthropic or OpenAI API key. The agent you're logged into is the brain.
+You do **not** need to add a model API key to this repository. The authenticated Codex session is the brain.
 
 ---
 
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/<you>/gtm-autopilot.git
-cd gtm-autopilot
+git clone https://github.com/miraeeon/gtm-autopilot.git voidrip-gtm-engine
+cd voidrip-gtm-engine
 npm ci                 # installs exact versions from package-lock.json
+codex mcp add voidrip-gtm-engine -- node "$PWD/bin/gtm-mcp.mjs"
 ```
 
 ---
@@ -124,16 +125,16 @@ Then read the rules the agent writes by: `node bin/gtm.mjs playbook`. To change 
 
 ## 6. Run your first loop, watching it
 
-Open the folder in Claude Code:
+Open the folder in Codex:
 
 ```bash
-claude
+codex
 ```
 
-Claude Code loads the MCP server (`.mcp.json`), the skills (`.claude/skills`) and the permissions (`.claude/settings.json`) automatically. Type:
+Codex reads `AGENTS.md` and discovers the repository skills under `.agents/skills/`. Ask:
 
 ```
-/gtm-daily-loop
+Use the gtm-daily-loop skill and run today's loop.
 ```
 
 You'll watch the agent work through each stage:
@@ -166,7 +167,7 @@ Nothing is sent: the campaigns are `off`, set to manual enrollment only, with au
 ## 8. Replies
 
 When prospects answer (once you're live), each morning's run detects the reply. The agent then:
-- gets the text, either from your mailbox connector (for example Gmail in Claude) or by asking you to paste it;
+- gets the text from an authorized mailbox connector or asks you to paste it;
 - classifies it and drafts an answer;
 - stops the sequence, excludes anyone who unsubscribed, and assigns hot replies to you.
 

@@ -1,6 +1,6 @@
 ---
 name: gtm-replies
-description: Handle prospect replies for GTM Autopilot — detect new replies from Overloop, fetch their text (Gmail/Outlook MCP or the user), classify each (interested, question, objection, not now, referral, not interested, unsubscribe, out of office, wrong person), draft the answer and apply safe follow-ups (exclusion list, stop the sequence, assign the conversation). Use during the daily loop or when the user asks about replies, the inbox, or who answered.
+description: Handle prospect replies for VOIDRIP GTM — detect replies from the execution adapter, fetch their text from an authorized mailbox connector or the user, classify each, draft the answer and apply safe follow-ups. Use during the daily loop or when the user asks about replies, the inbox, or who answered.
 ---
 
 # Handle replies

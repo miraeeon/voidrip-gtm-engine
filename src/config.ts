@@ -54,8 +54,8 @@ const EnvSchema = z.object({
   GTM_SCHEDULE_ENABLED: bool.default(true),
   GTM_SCHEDULE_TIME: hhmm.default('08:00'),
   GTM_SCHEDULE_DAYS: dayList.default(['MON', 'TUE', 'WED', 'THU', 'FRI']),
-  GTM_AGENT_CMD: z.string().default('claude').describe('agent CLI used by the daily runner'),
-  GTM_MODEL: z.string().default('claude-opus-5-5'),
+  GTM_AGENT_CMD: z.string().default('codex').describe('Codex CLI command used by the daily runner'),
+  GTM_MODEL: z.string().default('').describe('optional Codex model override; empty uses the configured default'),
   GTM_RUN_TIMEOUT_MIN: z.coerce.number().int().min(5).max(600).default(90),
   GTM_LOOP_NOTE: z.string().default('').describe('extra instructions appended to every daily run'),
 

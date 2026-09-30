@@ -1,6 +1,6 @@
 ---
 name: gtm-classify-route
-description: Classify GTM Autopilot leads (tier A/B/C/DQ, persona, intent 1-5, angle) and route each to email, LinkedIn or both, using Max signal evidence, the ICP, the playbook and learned weights. Use during the daily loop or when the user asks to classify, score, qualify or route leads.
+description: Classify VOIDRIP candidates (tier A/B/C/DQ, persona, intent 1-5, angle) and route each to email, LinkedIn or both, using source evidence, the current playbook and learned weights. Use during the daily loop or when the user asks to classify, score, qualify or route candidates.
 ---
 
 # Classify & route leads

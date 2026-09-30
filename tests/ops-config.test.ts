@@ -14,6 +14,7 @@ import { OverloopClient } from '../src/clients/overloop.js';
 import { MaxSourceAdapter } from '../src/adapters/max-source.js';
 import { OverloopExecutionAdapter } from '../src/adapters/overloop-execution.js';
 import { fakeFetch, freshEnv, maxLead } from './helpers.js';
+import { toolAllowedInRuntime, UNATTENDED_TOOL_NAMES } from '../src/safety/unattended.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gtm-'));
 
@@ -36,6 +37,8 @@ describe('config', () => {
     expect(toMinutes(c.OVERLOOP_SEND_START)).toBe(495);
     expect(() => parseConfig({ ...env, GTM_SCHEDULE_TIME: '25:00' })).toThrow(/HH:MM/);
     expect(parseConfig({}).MAX_API_KEY).toBeUndefined();
+    expect(parseConfig({}).GTM_AGENT_CMD).toBe('codex');
+    expect(parseConfig({}).GTM_MODEL).toBe('');
     expect(() => parseConfig({ ...env, MAX_API_KEY: 'short' })).toThrow(/looks too short/);
   });
 });
@@ -48,18 +51,30 @@ describe('ops', () => {
     const line = cronLine(getConfig());
     expect(line.startsWith('5 7 * * 1,5,0 ')).toBe(true);
     expect(line).toContain('bin/gtm.mjs daily');
-    expect(line).toContain('# gtm-autopilot:');
+    expect(line).toContain('# voidrip-gtm-engine:');
   });
 
   it('agent invocation never allows approve/launch on unattended runs', () => {
+    setConfigForTests({ GTM_AGENT_CMD: 'legacy-agent', GTM_MODEL: 'legacy-model' });
     const inv = buildAgentInvocation(getConfig(), 'extra');
-    for (const t of ['mcp__gtm-autopilot__gtm_approve', 'mcp__gtm-autopilot__gtm_launch']) {
+    for (const t of ['mcp__voidrip-gtm-engine__gtm_approve', 'mcp__voidrip-gtm-engine__gtm_launch']) {
       expect(UNATTENDED_DENY).toContain(t);
       expect(inv.args).toContain(t);
     }
-    expect(inv.prompt).toMatch(/^\/gtm-daily-loop .*unattended.*extra$/);
+    expect(inv.prompt).toMatch(/^Use the gtm-daily-loop skill\. .*unattended.*extra$/);
     setConfigForTests({ GTM_AGENT_CMD: 'codex' });
-    expect(buildAgentInvocation(getConfig()).args[0]).toBe('exec');
+    expect(buildAgentInvocation(getConfig()).args).toEqual(['exec', '--sandbox', 'read-only', '-']);
+    setConfigForTests({ GTM_AGENT_CMD: 'codex', GTM_MODEL: 'gpt-test' });
+    expect(buildAgentInvocation(getConfig()).args).toEqual(['exec', '--sandbox', 'read-only', '--model', 'gpt-test', '-']);
+  });
+
+  it('removes sensitive tools from unattended MCP runtimes', () => {
+    for (const name of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop']) {
+      expect(UNATTENDED_TOOL_NAMES).toContain(name);
+      expect(toolAllowedInRuntime(name, true)).toBe(false);
+      expect(toolAllowedInRuntime(name, false)).toBe(true);
+    }
+    expect(toolAllowedInRuntime('gtm_status', true)).toBe(true);
   });
 
   it('lock is exclusive and released', () => {

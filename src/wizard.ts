@@ -30,7 +30,7 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
   const step = (n: number, t: string) => console.log(`\n${c.b(`${n}. ${t}`)}`);
 
   try {
-    console.log(c.b('\n🛰️  GTM Autopilot setup') + c.d(`  (${ROOT})`));
+    console.log(c.b('\n🛰️  VOIDRIP GTM Engine setup') + c.d(`  (${ROOT})`));
 
     step(1, 'Node.js');
     const [maj, min] = process.versions.node.split('.').map(Number);
@@ -128,10 +128,10 @@ export async function runWizard(opts: { yes?: boolean } = {}) {
 
     step(9, 'Health check');
     const sys = systemChecks();
-    console.log(`   node ${sys.node.ok ? c.g('ok') : c.r('too old')} · database ${sys.database.ok ? c.g('ok') : c.r('missing tables')} · agent CLI "${sys.agent_cli.cmd}" ${sys.agent_cli.ok ? c.g(sys.agent_cli.version ?? 'ok') : c.y('not found — install Claude Code (https://claude.com/claude-code) or set GTM_AGENT_CMD')}`);
+    console.log(`   node ${sys.node.ok ? c.g('ok') : c.r('too old')} · database ${sys.database.ok ? c.g('ok') : c.r('missing tables')} · agent CLI "${sys.agent_cli.cmd}" ${sys.agent_cli.ok ? c.g(sys.agent_cli.version ?? 'ok') : c.y('not found — install Codex or set GTM_AGENT_CMD')}`);
 
     console.log(`\n${c.b('Done. Next:')}
-  • Open this folder in ${c.b('Claude Code')} and type ${c.b('/gtm-daily-loop')} — or run ${c.b('npm run daily')} for an unattended run
+  • Open this folder in ${c.b('Codex')} and ask it to use ${c.b('gtm-daily-loop')} — or run ${c.b('npm run daily')} for an unattended run
   • Review drafts:  ${c.b('node bin/gtm.mjs review')}      Replies:  ${c.b('node bin/gtm.mjs replies')}
   • Health:        ${c.b('node bin/gtm.mjs doctor')}      Docs: docs/GETTING_STARTED.md
   • Sending stays ${c.b('locked')} until you set SEND_MODE=live and approve + launch campaigns yourself.\n`);

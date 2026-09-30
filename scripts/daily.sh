@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GTM Autopilot — daily run (macOS / Linux). Thin wrapper around the cross-platform runner:
+# VOIDRIP GTM Engine — daily run (macOS / Linux). Thin wrapper around the cross-platform runner:
 #   lock → DB backup → housekeeping → agent (/gtm-daily-loop, approve/launch disallowed) → report
 # Schedule it with:  npm run schedule      (installs a cron entry from GTM_SCHEDULE_* in .env)
 set -euo pipefail

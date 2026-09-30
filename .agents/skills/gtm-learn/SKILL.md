@@ -1,6 +1,6 @@
 ---
 name: gtm-learn
-description: Learn from GTM Autopilot outreach results — sync Overloop engagement, analyze reply/positive/meeting rates by signal, tier, persona, route and hook, then feed the intelligence back by updating the playbook, weights and Max signal subscriptions. Use during the daily loop or when the user asks what's working, to analyze results, or to improve targeting and messaging.
+description: Learn from VOIDRIP GTM results — sync execution outcomes, analyze reply, positive and meeting rates by source, signal, tier, persona, route and hook, then feed the intelligence back into the playbook and weights. Use during the daily loop or when the user asks what's working, to analyze results, or to improve targeting and messaging.
 ---
 
 # Learn from results

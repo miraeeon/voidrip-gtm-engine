@@ -1,6 +1,6 @@
 ---
 name: gtm-write-sequence
-description: Write, self-critique and finalize lead-specific multichannel outreach sequences (email + LinkedIn) for GTM Autopilot, using each lead's Max buying signal as the hook, then save them for Overloop. Use during the daily loop or when the user asks to write, draft, rewrite or improve outreach sequences.
+description: Write, self-critique and finalize candidate-specific multichannel outreach sequences for VOIDRIP, using verified evidence as the hook, then save inert drafts through the configured execution adapter. Use during the daily loop or when the user asks to write, draft, rewrite or improve outreach sequences.
 ---
 
 # Write sequences

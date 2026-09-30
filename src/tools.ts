@@ -1,8 +1,6 @@
 /**
  * One registry of GTM tools shared by the MCP server and the CLI. The engine is
- * deterministic; the intelligence (classification, routing, writing, learning)
- * comes from whichever agent calls these tools — Claude Code, Codex, Claude
- * Desktop, Cursor, …
+ * deterministic; Codex supplies classification, routing, writing and learning.
  */
 import { z } from 'zod';
 import { businessId as configuredBusinessId, getConfig } from './config.js';

@@ -1,17 +1,17 @@
 <div align="center">
 
-# gtm-autopilot
+# voidrip-gtm-engine
 
-### Signal-based outbound on Claude Opus 5.5. max finds the people who just showed a buying signal, Opus decides who deserves a message and writes it for that one person, and Overloop AI holds every sequence until you approve it. It drafts. It never sends on its own.
+### VOIDRIP outbound orchestration with Codex. Source adapters supply candidates, Codex evaluates and writes, and execution adapters hold every activation behind human approval.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)
 ![Node 22.13+](https://img.shields.io/badge/node-22.13%2B-339933.svg)
-![Runs on Claude Opus 5.5](https://img.shields.io/badge/runs%20on-Claude%20Opus%205.5-D97757.svg)
+![Runs on Codex](https://img.shields.io/badge/runs%20on-Codex-111827.svg)
 ![Leads from max](https://img.shields.io/badge/leads%20from-max-EE5D8B.svg)
 ![MCP server](https://img.shields.io/badge/MCP-32%20tools-7c3aed.svg)
 ![Send mode locked by default](https://img.shields.io/badge/send%20mode-locked%20by%20default-success.svg)
 
-**Leads from [max](https://yourmax.ai). Sequences in [Overloop AI](https://overloop.com). The thinking in [Claude Code](https://claude.com/claude-code).**
+**Max and Overloop are optional bundled adapters. [Codex](https://developers.openai.com/codex/) is the qualification and orchestration engine.**
 
 </div>
 
@@ -19,10 +19,10 @@
 
 A buying signal tells you who to look at this week. It doesn't tell you what to say, and some signals you can never say out loud. When we ran this on our own max account, 92 of the first 100 leads came from someone connecting with a person on a competitor's sales team. That's great timing, and it can never appear in an email.
 
-gtm-autopilot is the loop that handles everything after the signal. Opus 5.5 runs inside Claude Code and makes every judgment: the tier, the channel, what each channel carries, the sequence for that one person, the answer when they reply. Plain code checks all of it, blocks anything that could send, and hands the campaigns to Overloop AI switched off. Nothing in the repo calls a model API. Opus runs on the Claude Code login you already have.
+voidrip-gtm-engine is the execution loop around the persistent Market Map. Codex makes the qualification and messaging judgments; deterministic code validates them, keeps activation locked, and records results for learning. The repository does not call a model API directly: it is driven by the authenticated Codex client through MCP.
 
 ```
-max finds them. Opus decides and writes. Code checks. You approve.
+max finds them. Codex decides and writes. Code checks. You approve.
 ```
 
 ## Contents
@@ -30,7 +30,7 @@ max finds them. Opus decides and writes. Code checks. You approve.
 1. [How it works](#how-it-works)
 2. [Install and run, step by step](#install-and-run-step-by-step)
 3. [Connect your agent](#connect-your-agent)
-4. [What Opus decides](#what-opus-decides)
+4. [What Codex decides](#what-codex-decides)
 5. [Replies](#replies)
 6. [Learning from results](#learning-from-results)
 7. [Command reference](#command-reference)
@@ -49,12 +49,12 @@ max finds them. Opus decides and writes. Code checks. You approve.
 flowchart LR
     S["max<br/>buying signals, evidence attached"] --> A["Source and dedupe"]
     A --> B["Check Overloop history<br/>read-only"]
-    B --> C["Opus 5.5 tiers and routes<br/>A / B / C / DQ, channel plan"]
-    C --> D["Opus 5.5 writes<br/>one sequence per person"]
+    B --> C["Codex tiers and routes<br/>A / B / C / DQ, channel plan"]
+    C --> D["Codex writes<br/>one sequence per person"]
     D --> E["Linter and SendGuard<br/>plain code"]
     E --> F["Overloop AI<br/>one campaign per lead, switched off"]
     F --> H["You review, approve, launch"]
-    F -- "opens, replies, bounces" --> L["Opus 5.5 learns<br/>playbook vN+1, weights"]
+    F -- "opens, replies, bounces" --> L["Codex learns<br/>playbook vN+1, weights"]
     L -.-> C
 ```
 
@@ -63,11 +63,11 @@ flowchart LR
 | # | Stage | Who does it | Tools |
 |---|---|---|---|
 | 0 | **Preflight:** both platforms reachable, send mode, seller profile | code | `gtm_doctor` |
-| 1 | **Learn from yesterday:** sync engagement, analyze, update the playbook and weights | code + Opus | `gtm_sync_results` → `gtm_get_performance` → `gtm_save_learnings` |
-| 2 | **Replies:** detect, fetch the text, sort, draft an answer | code + Opus | `gtm_get_reply_queue` → `gtm_ingest_reply` → `gtm_save_reply_triage` |
+| 1 | **Learn from yesterday:** sync engagement, analyze, update the playbook and weights | code + Codex | `gtm_sync_results` → `gtm_get_performance` → `gtm_save_learnings` |
+| 2 | **Replies:** detect, fetch the text, sort, draft an answer | code + Codex | `gtm_get_reply_queue` → `gtm_ingest_reply` → `gtm_save_reply_triage` |
 | 3 | **Source:** new max leads, deduped, each checked against Overloop | code | `gtm_source_leads` |
-| 4 | **Tier and route:** A / B / C / DQ, persona, intent, route, channel plan, angle | Opus | `gtm_get_classification_queue` → `gtm_save_classifications` |
-| 5 | **Write:** one sequence per person, a seven-point self-check, then the linter | Opus (+ parallel subagents) | `gtm_get_drafting_queue` → `gtm_save_sequence` |
+| 4 | **Tier and route:** A / B / C / DQ, persona, intent, route, channel plan, angle | Codex | `gtm_get_classification_queue` → `gtm_save_classifications` |
+| 5 | **Write:** one sequence per person, a seven-point self-check, then the linter | Codex (+ parallel subagents) | `gtm_get_drafting_queue` → `gtm_save_sequence` |
 | 6 | **Push:** the prospect plus one switched-off campaign per lead, with the exact copy | code | `gtm_push_to_overloop` → `gtm_verify_overloop` |
 | 7 | **Review:** a human reads, approves and launches. Never automatic | you | `gtm_review_queue` → `gtm_approve` → `gtm_launch` |
 | 8 | **Report:** the daily brief in `reports/YYYY-MM-DD.md` | code | `gtm_write_report` |
@@ -77,14 +77,11 @@ The next morning, the new playbook and weights shape steps 4 and 5. That's the l
 ### The folder
 
 ```
-gtm-autopilot/
-  CLAUDE.md                   the house rules Opus follows
-  AGENTS.md                   the same rules for Codex and other agents
-  .mcp.json                   registers the gtm-autopilot MCP server
-  .claude/skills/             gtm-daily-loop, gtm-classify-route, gtm-write-sequence,
+voidrip-gtm-engine/
+  AGENTS.md                   the repository rules Codex follows
+  .mcp.json                   registers the voidrip-gtm-engine MCP server
+  .agents/skills/             gtm-daily-loop, gtm-classify-route, gtm-write-sequence,
                               gtm-replies, gtm-learn
-  .claude/agents/             sequence-writer, for drafting big batches in parallel
-  .claude/settings.json       enables the MCP server; approve, launch and cleanup always ask
   data/playbook.md            tiers, routing and writing rules (seed; versions live in the database)
   bin/                        gtm.mjs (CLI) and gtm-mcp.mjs (MCP server), TypeScript run through tsx
   src/clients/                max.ts, overloop.ts, http.ts (rate limits, retries, 429 backoff)
@@ -101,14 +98,15 @@ gtm-autopilot/
 
 ## Install and run, step by step
 
-**You need:** Node.js 22.13 or newer (it uses the built-in `node:sqlite`, so there's no native build), a [max](https://yourmax.ai) account with an API key, an [Overloop AI](https://overloop.com) account with an API key, and [Claude Code](https://claude.com/claude-code). No separate model API key.
+**You need:** Node.js 22.13 or newer, Codex, and credentials only for the source and execution adapters you actually enable. The bundled Max and Overloop adapters are optional.
 
 ### Step 1 - Get the code
 
 ```bash
-git clone https://github.com/OWNER/gtm-autopilot.git
-cd gtm-autopilot
+git clone https://github.com/miraeeon/gtm-autopilot.git voidrip-gtm-engine
+cd voidrip-gtm-engine
 npm ci
+codex mcp add voidrip-gtm-engine -- node "$PWD/bin/gtm-mcp.mjs"
 alias gtm="node bin/gtm.mjs"
 ```
 
@@ -120,7 +118,7 @@ npm run setup
 
 One guided pass, safe to re-run (press Enter to keep a value). It creates `.env` from `.env.example`, asks for your max and Overloop keys and tests both live, picks your business in max (type its id, or paste your website and max suggests an ICP), creates the database, saves your seller profile, and sets the schedule and daily caps.
 
-> The seller profile is the file to take your time on. Its proof points are the only numbers Opus is allowed to use in outreach. Any percentage, multiplier or "far more" claim that isn't there gets flagged by the linter.
+> The seller profile is the file to take your time on. Its proof points are the only numbers Codex is allowed to use in outreach. Any percentage, multiplier or "far more" claim that isn't there gets flagged by the linter.
 
 ### Step 3 - Check everything is green
 
@@ -150,13 +148,13 @@ A fresh subscription can take a few hours before its first leads.
 
 ### Step 5 - Run the loop once and watch it
 
-Open the folder in Claude Code (`claude`). The MCP server, the five skills and the subagent load by themselves. Then type:
+Open the folder in Codex (`codex`). Codex reads `AGENTS.md` and discovers the five repository skills. Then ask:
 
 ```
-/gtm-daily-loop
+Use the gtm-daily-loop skill and run today's loop.
 ```
 
-> **What you should see:** Opus sources the new leads, tiers them, writes a sequence for each one worth a message and pushes them to Overloop as switched-off campaigns. The brief lands in `reports/`. Nobody is enrolled and nothing is sent.
+> **What you should see:** Codex sources the new leads, tiers them, writes a sequence for each one worth a message and pushes them to Overloop as switched-off campaigns. The brief lands in `reports/`. Nobody is enrolled and nothing is sent.
 
 ### Step 6 - Read before anything goes out
 
@@ -166,7 +164,7 @@ gtm report           # today's brief
 gtm replies          # hot replies first, with drafted answers
 ```
 
-Read the DQs first: they tell you quickly whether Opus understood who you sell to. Then read three campaigns the way the prospect would. When a line could go to someone else, change the rule in `data/playbook.md` and run `gtm playbook --reload`, so every lead after it gets the fix.
+Read the DQs first: they tell you quickly whether Codex understood who you sell to. Then read three campaigns the way the prospect would. When a line could go to someone else, change the rule in `data/playbook.md` and run `gtm playbook --reload`, so every lead after it gets the fix.
 
 ### Step 7 - Make it yours
 
@@ -174,7 +172,7 @@ Read the DQs first: they tell you quickly whether Opus understood who you sell t
 |---|---|
 | How leads are tiered and routed, and the writing rules | `data/playbook.md`, then `gtm playbook --reload` (or let the learn step do it) |
 | What your company may claim | `gtm seller --set …` (proof points are the only numbers allowed) |
-| The self-check or the daily steps | `.claude/skills/*/SKILL.md` |
+| The self-check or the daily steps | `.agents/skills/*/SKILL.md` |
 | Lint rules (length, spam words, clichés, claims) | `src/pipeline/sequence.ts` → `lintSequence` |
 | The routing rules code enforces | `src/pipeline/route.ts` |
 
@@ -190,7 +188,7 @@ gtm approve 123 456                 # approve specific campaigns (--revoke to un
 gtm launch 123 456 --confirm SEND   # enroll and activate the approved ones
 ```
 
-`launch` only takes approved campaigns and the word SEND. Right before it enrolls anyone, it checks Overloop again and skips whoever replied, bounced or got excluded since the push. In Claude Code, approve and launch always ask you first.
+`launch` only takes approved campaigns and the word SEND. Right before it enrolls anyone, it checks Overloop again and skips whoever replied, bounced or got excluded since the push. In Codex, approve and launch always ask you first.
 
 > Read ten drafts back to back first. `SEND_MODE=live` is a deliberate choice, never the default.
 
@@ -200,19 +198,13 @@ gtm launch 123 456 --confirm SEND   # enroll and activate the approved ones
 npm run schedule
 ```
 
-This installs the schedule from `.env` (weekdays at 08:00 by default): cron on macOS and Linux, Task Scheduler on Windows. Each run takes a lock, backs up the database, then starts Claude Code headless on Opus 5.5 with a fenced tool list:
+This installs the schedule from `.env` (weekdays at 08:00 by default): cron on macOS and Linux, Task Scheduler on Windows. Each run takes a lock, backs up the database, then starts Codex non-interactively in a read-only shell sandbox:
 
 ```bash
-claude -p "/gtm-daily-loop" --model claude-opus-5-5 \
-  --allowedTools "mcp__gtm-autopilot__*" Read Skill Agent \
-  --disallowedTools mcp__gtm-autopilot__gtm_approve mcp__gtm-autopilot__gtm_launch \
-    mcp__gtm-autopilot__gtm_cleanup_overloop mcp__gtm-autopilot__gtm_manage_subscription \
-    mcp__gtm-autopilot__gtm_update_icp mcp__gtm-autopilot__gtm_init \
-    mcp__gtm-autopilot__gtm_simulate_results mcp__gtm-autopilot__gtm_simulate_replies \
-    Bash PowerShell Write Edit
+GTM_UNATTENDED=1 codex exec --sandbox read-only -
 ```
 
-The scheduled run sources, tiers, writes, pushes switched-off campaigns, sorts replies, learns and writes the brief. It can't approve, launch or clean up, it can't touch your ICP, and it has no shell and no Write or Edit tool. The learn step does rewrite the playbook, and the skill tells Opus to apply a max subscription change only when you've allowed signal changes. Keep scheduled runs in locked mode unless you've read what they produce for a while. Logs go to `reports/run-*.log`.
+The scheduled run sources, tiers, writes, pushes switched-off campaigns, sorts replies, learns and writes the brief. With `GTM_UNATTENDED=1`, the MCP server does not expose approval, launch, cleanup, simulation or source-configuration mutations. Keep scheduled runs in locked mode. Logs go to `reports/run-*.log`.
 
 ---
 
@@ -220,28 +212,20 @@ The scheduled run sources, tiers, writes, pushes switched-off campaigns, sorts r
 
 The engine is a standard MCP server over stdio: `node bin/gtm-mcp.mjs`.
 
-**Claude Code (recommended).** Nothing to do. `.mcp.json` registers the server, and the skills and subagent load when you open the folder.
-
-```
-/gtm-daily-loop            the full day
-"classify the new leads"   runs gtm-classify-route
-"what's working?"          runs gtm-learn
-```
-
-**Codex.**
+**Codex.** Register the server once with an absolute path:
 
 ```bash
-codex mcp add gtm-autopilot -- node bin/gtm-mcp.mjs
+codex mcp add voidrip-gtm-engine -- node /absolute/path/to/voidrip-gtm-engine/bin/gtm-mcp.mjs
 ```
 
-Codex reads `AGENTS.md`, which points it at the same skills.
+Codex reads `AGENTS.md` and the skills under `.agents/skills/`.
 
-**Claude Desktop, Cursor or any MCP client.**
+**Other MCP clients.**
 
 ```json
 {
   "mcpServers": {
-    "gtm-autopilot": { "command": "node", "args": ["/absolute/path/to/gtm-autopilot/bin/gtm-mcp.mjs"] }
+    "voidrip-gtm-engine": { "command": "node", "args": ["/absolute/path/to/voidrip-gtm-engine/bin/gtm-mcp.mjs"] }
   }
 }
 ```
@@ -259,13 +243,13 @@ gtm sequence @sequences.json
 
 ---
 
-## What Opus decides
+## What Codex decides
 
 ### Tier, route and a channel plan
 
-For every lead, Opus reads the evidence max attached, the channels you actually have for that person, their Overloop history, the seller profile, the playbook, the weights and the latest learnings. It decides:
+For every lead, Codex reads the evidence max attached, the channels you actually have for that person, their Overloop history, the seller profile, the playbook, the weights and the latest learnings. It decides:
 
-| Field | What Opus decides |
+| Field | What Codex decides |
 |---|---|
 | `tier` | A, B, C or DQ. In doubt between B and C it picks C, between C and DQ it picks DQ |
 | `persona` | a short reusable label, like `head-of-growth`, so results can be grouped |
@@ -296,7 +280,7 @@ Then `route.ts` checks the choice against what's actually possible, and code win
 
 ### Signals you can say, and signals that only tell you when
 
-| Signal | Say it? | How Opus uses it |
+| Signal | Say it? | How Codex uses it |
 |---|---|---|
 | A public post or comment | yes, the topic | open with their point, add a view |
 | Funding, hiring, M&A, a tender | yes, it's public news | a short congrats, then the problem it creates |
@@ -308,7 +292,7 @@ Then `route.ts` checks the choice against what's actually possible, and code win
 
 ### Writing, then checking
 
-Opus drafts each sequence, checks it against seven questions, fixes what fails, and saves it:
+Codex drafts each sequence, checks it against seven questions, fixes what fails, and saves it:
 
 ```
 1. hook        does the first touch come from the lead data, and only from it
@@ -332,7 +316,7 @@ warn     a first touch that names neither the person nor their company
 warn     a percentage, a multiplier or "far more" that isn't a proof point
 ```
 
-With an error the sequence stays a draft and can't be pushed. A warning goes back to Opus as a judgment call. Past ten leads, the skill splits the queue into batches of five to eight for the `sequence-writer` subagent, which has no push tool.
+With an error the sequence stays a draft and can't be pushed. A warning goes back to Codex as a judgment call. Past ten leads, the skill splits the queue into batches of five to eight for the `sequence-writer` subagent, which has no push tool.
 
 ### Push, switched off
 
@@ -349,7 +333,7 @@ One campaign per lead keeps every message readable and editable inside Overloop.
 
 ## Replies
 
-`gtm sync` sees who replied in Overloop, and Opus reads the text from your Gmail or Outlook MCP. For a LinkedIn reply, or with no mailbox connected, it lists the names and asks you to paste the text (`gtm reply-add --lead <id> --text "…"`). It never guesses what someone said.
+`gtm sync` sees who replied in Overloop, and Codex reads the text from your Gmail or Outlook MCP. For a LinkedIn reply, or with no mailbox connected, it lists the names and asks you to paste the text (`gtm reply-add --lead <id> --text "…"`). It never guesses what someone said.
 
 Each reply goes into one of ten buckets:
 
@@ -358,7 +342,7 @@ interested       question        objection        not now          referral
 not interested   unsubscribe     out of office    wrong person     other
 ```
 
-For each one, Opus writes a one-line summary, the next step for a human, and a drafted answer in the prospect's language, using only the seller profile. If the answer isn't there (pricing, for example), it says so and tells you what to add. Code handles the safe follow-ups: an unsubscribe goes on the Overloop exclusion list, any human answer stops the sequence, and a hot reply gets the conversation assigned to a person. The answer itself waits in `gtm replies` for you to send.
+For each one, Codex writes a one-line summary, the next step for a human, and a drafted answer in the prospect's language, using only the seller profile. If the answer isn't there (pricing, for example), it says so and tells you what to add. Code handles the safe follow-ups: an unsubscribe goes on the Overloop exclusion list, any human answer stops the sequence, and a hot reply gets the conversation assigned to a person. The answer itself waits in `gtm replies` for you to send.
 
 ---
 
@@ -366,7 +350,7 @@ For each one, Opus writes a one-line summary, the next step for a human, and a d
 
 `gtm sync` pulls opens, clicks, replies and bounces from Overloop, counting only what happened after the push. `gtm performance` breaks reply, positive-reply and meeting rates down by signal, tier, persona, route, first channel, hook type, intent and playbook version.
 
-Then Opus writes the learnings: each finding with the numbers behind it and a confidence level, new weights, and the full playbook rewritten and saved as a new version. The skill caps a weight move at 0.3 a day (0.1 on a small sample), and code clamps every weight between 0 and 3. Buckets with too few contacts are flagged, and the loop refuses to conclude from them.
+Then Codex writes the learnings: each finding with the numbers behind it and a confidence level, new weights, and the full playbook rewritten and saved as a new version. The skill caps a weight move at 0.3 a day (0.1 on a small sample), and code clamps every weight between 0 and 3. Buckets with too few contacts are flagged, and the loop refuses to conclude from them.
 
 Test data is labelled everywhere it shows up: `gtm simulate` and `gtm simulate-replies` exist to exercise the loop, and their rows are flagged simulated in the database, the performance numbers and the brief.
 
@@ -447,7 +431,7 @@ Run through `node bin/gtm.mjs …`, the alias from step 1, or `npm link` once fo
 |---|---|
 | **Bundled adapters** | `MAX_API_KEY`, `OVERLOOP_API_KEY`, `MAX_BUSINESS_ID` (only required when using the bundled Max/Overloop adapters) |
 | **Safety** | `SEND_MODE` (`locked`), `OVERLOOP_NAME_PREFIX` (`[GTM-BOT]`) |
-| **Schedule** | `GTM_SCHEDULE_TIME` (`08:00`), `GTM_SCHEDULE_DAYS` (`MON…FRI`), `GTM_AGENT_CMD` (`claude`), `GTM_MODEL` (`claude-opus-5-5`), `GTM_RUN_TIMEOUT_MIN` (`90`) |
+| **Schedule** | `GTM_SCHEDULE_TIME` (`08:00`), `GTM_SCHEDULE_DAYS` (`MON…FRI`), `GTM_AGENT_CMD` (`codex`), optional `GTM_MODEL`, `GTM_RUN_TIMEOUT_MIN` (`90`) |
 | **Daily volume** | `GTM_DAILY_NEW_LEADS` (`40`), `GTM_DAILY_SEQUENCES` (`25`), `GTM_DAILY_PUSH_LIMIT` (`25`), `GTM_SOURCE_MAX_PAGES` (`10`) |
 | **Sending window** | `OVERLOOP_SENDING_DAYS` (`MON…FRI`), `OVERLOOP_SEND_START` (`09:00`), `OVERLOOP_SEND_END` (`17:00`), `OVERLOOP_TIMEZONE`, `OVERLOOP_SENDER_ID` |
 | **Storage** | `GTM_DB_PATH` (`data/gtm.db`), `GTM_REPORTS_DIR`, `GTM_BACKUP_DIR`, `GTM_BACKUP_KEEP` (`14`), `GTM_LOG_RETENTION_DAYS` (`30`) |
@@ -462,12 +446,12 @@ After changing the schedule, run `npm run schedule` again.
 
 The repo takes you from a buying signal to a sequence written for one person, waiting in Overloop for your yes. At volume, the daily watch is what takes the real time: following your signals every morning and deciding who is worth a message today. That is what we build at Sortlist.
 
-| | **gtm-autopilot** (free, you run it) | **[max](https://yourmax.ai)** (fully managed) |
+| | **voidrip-gtm-engine** (free, you run it) | **[max](https://yourmax.ai)** (fully managed) |
 |---|---|---|
 | **Signals** | your max subscriptions, pulled each morning | watched for you 24/7 |
-| **Who to contact** | Opus tiers and routes, with your playbook | a fresh ranked list every morning, with why each one is there and the evidence attached |
-| **Outreach** | Opus writes, Overloop AI holds it, you approve | leads pushed straight into Overloop AI |
-| **Cost** | your Claude Code plan, plus your max and Overloop plans | paid |
+| **Who to contact** | Codex tiers and routes, with your playbook | a fresh ranked list every morning, with why each one is there and the evidence attached |
+| **Outreach** | Codex writes, Overloop AI holds it, you approve | leads pushed straight into Overloop AI |
+| **Cost** | your Codex plan, plus your max and Overloop plans | paid |
 
 ---
 
@@ -515,11 +499,11 @@ npx tsx scripts/safety-check.ts   # live negative test on your Overloop: tries t
 
 [Nicolas Finet](https://be.linkedin.com/in/nifinet), co-founder and CEO of [Sortlist](https://www.sortlist.com). Sortlist owns [Overloop AI](https://overloop.com), the outbound engine, and builds [max](https://yourmax.ai), our AI growth agent.
 
-I like to build. This is the whole daily loop in one repo, from the signal to a sequence written for one person, and it runs on the Claude Code you already have. The fully managed version is [max](https://yourmax.ai).
+I like to build. This is the whole daily loop in one repo, from the signal to a sequence written for one person, and it runs on the Codex you already have. The fully managed version is [max](https://yourmax.ai).
 
 ## Contributing
 
-Found a signal Opus should never mention, a lint rule that's too eager, or a routing case the code gets wrong? Open an issue or send a PR. Every case someone adds to the tests makes the next run safer.
+Found a signal Codex should never mention, a lint rule that's too eager, or a routing case the code gets wrong? Open an issue or send a PR. Every case someone adds to the tests makes the next run safer.
 
 ## License
 
