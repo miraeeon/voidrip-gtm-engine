@@ -6,6 +6,8 @@ import { enrichFromOverloop } from '../src/pipeline/enrich.js';
 import { sourceLeads } from '../src/pipeline/source.js';
 import { MaxClient } from '../src/clients/max.js';
 import { OverloopClient } from '../src/clients/overloop.js';
+import { MaxSourceAdapter } from '../src/adapters/max-source.js';
+import { OverloopExecutionAdapter } from '../src/adapters/overloop-execution.js';
 import { one } from '../src/db/db.js';
 import { fakeFetch, freshEnv, maxLead } from './helpers.js';
 
@@ -88,14 +90,14 @@ describe('enrich + classify end to end', () => {
   beforeEach(() => freshEnv());
   it('stores Overloop history and applies it on save', async () => {
     const mf = fakeFetch({ 'GET /leads': () => ({ leads: [maxLead(1), maxLead(2)], meta: { current_page: 1, total_pages: 1, total_count: 2, per_page: 100 } }) });
-    await sourceLeads({ max: new MaxClient({ fetchImpl: mf.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' }), businessId: 143 });
+    await sourceLeads({ source: new MaxSourceAdapter(new MaxClient({ fetchImpl: mf.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' })), businessId: 143 });
     const of = fakeFetch({
       'GET /prospects': (_b, url) =>
         decodeURIComponent(url).includes('jane1@acme.com')
           ? { data: [{ id: 9, email: 'jane1@acme.com', replied: true, bounced: false, excluded: false, email_status: 'found' }], pagination: {} }
           : { data: [], pagination: {} },
     });
-    const r = await enrichFromOverloop({ client: new OverloopClient({ fetchImpl: of.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k' }) });
+    const r = await enrichFromOverloop({ execution: new OverloopExecutionAdapter(new OverloopClient({ fetchImpl: of.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k' })) });
     expect(r.already_in_overloop).toBe(1);
     const saved = saveClassifications([
       { lead_id: 1, tier: 'A', persona: 'cmo', intent_strength: 5, route: 'both', angle: 'speed', reasoning: 'Strong signal and fit.' },

@@ -76,10 +76,12 @@ export class MaxClient {
 
   constructor(opts: { apiKey?: string; baseUrl?: string; fetchImpl?: FetchLike } = {}) {
     const cfg = getConfig();
+    const apiKey = opts.apiKey ?? cfg.MAX_API_KEY;
+    if (!apiKey) throw new Error('Max adapter is not configured — set MAX_API_KEY or use another SourceAdapter');
     this.http = new HttpClient({
       service: 'Max',
       baseUrl: opts.baseUrl ?? cfg.MAX_API_URL,
-      headers: { Authorization: `Bearer ${opts.apiKey ?? cfg.MAX_API_KEY}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
       perMinute: 55,
       fetchImpl: opts.fetchImpl,
     });

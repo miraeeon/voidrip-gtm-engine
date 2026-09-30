@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MaxClient } from '../src/clients/max.js';
 import { OverloopClient } from '../src/clients/overloop.js';
+import { MaxSourceAdapter } from '../src/adapters/max-source.js';
+import { OverloopExecutionAdapter } from '../src/adapters/overloop-execution.js';
 import { SendGuard } from '../src/safety/guard.js';
 import { auditSink, one } from '../src/db/db.js';
 import { sourceLeads } from '../src/pipeline/source.js';
@@ -18,7 +20,7 @@ function maxWith(leads: any[]) {
   const f = fakeFetch({
     'GET /leads': () => ({ leads, meta: { current_page: 1, total_pages: 1, total_count: leads.length, per_page: 100 } }),
   });
-  return new MaxClient({ fetchImpl: f.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' });
+  return new MaxSourceAdapter(new MaxClient({ fetchImpl: f.fn, baseUrl: 'https://max.test/api/v1', apiKey: 'k' }));
 }
 
 function overloopFake() {
@@ -29,8 +31,10 @@ function overloopFake() {
     'POST /campaigns': (b) => ({ data: { id: nextId++, ...b } }),
     'POST /enrollments': () => ({ data: { id: 1 } }),
   });
-  const client = new OverloopClient({ fetchImpl: f.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k', guard: new SendGuard('locked', auditSink) });
-  return { client, calls: f.calls };
+  const execution = new OverloopExecutionAdapter(
+    new OverloopClient({ fetchImpl: f.fn, baseUrl: 'https://ovl.test/public/v2', apiKey: 'k', guard: new SendGuard('locked', auditSink) }),
+  );
+  return { execution, calls: f.calls };
 }
 
 const seqFor = (id: number, route: 'email' | 'linkedin' | 'both') => ({
@@ -59,12 +63,12 @@ describe('end-to-end pipeline (mocked APIs)', () => {
 
   it('sources, dedupes, classifies, drafts, pushes inert, simulates, learns, reports', async () => {
     const leads = [maxLead(1), maxLead(2, { email: null }), maxLead(3, { email: 'jane1@acme.com' }), maxLead(4)];
-    const src = await sourceLeads({ max: maxWith(leads), businessId: 143 });
+    const src = await sourceLeads({ source: maxWith(leads), businessId: 143 });
     expect(src.inserted).toBe(4);
     expect(src.duplicates).toBe(1);
 
     // re-sourcing is idempotent
-    const again = await sourceLeads({ max: maxWith(leads), businessId: 143 });
+    const again = await sourceLeads({ source: maxWith(leads), businessId: 143 });
     expect(again.inserted).toBe(0);
 
     const q = getClassificationQueue(10);
@@ -91,7 +95,7 @@ describe('end-to-end pipeline (mocked APIs)', () => {
     expect(r2.ok && r2.status).toBe('final');
 
     const ovl = overloopFake();
-    const pushed = await pushToOverloop({ client: ovl.client });
+    const pushed = await pushToOverloop({ execution: ovl.execution });
     expect(pushed.pushed).toBe(2);
     const campaignBodies = ovl.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/campaigns')).map((c) => c.body);
     for (const b of campaignBodies) {
@@ -123,11 +127,11 @@ describe('end-to-end pipeline (mocked APIs)', () => {
   });
 
   it('enroll attempt in locked mode is blocked and audited, nothing enrolled', async () => {
-    await sourceLeads({ max: maxWith([maxLead(1)]), businessId: 143 });
+    await sourceLeads({ source: maxWith([maxLead(1)]), businessId: 143 });
     saveClassifications([{ lead_id: 1, tier: 'A', persona: 'cmo', intent_strength: 5, route: 'email', angle: 'speed', reasoning: 'Strong signal and fit.' }]);
     saveSequence(seqFor(1, 'email'));
     const ovl = overloopFake();
-    const res = await pushToOverloop({ client: ovl.client, enroll: true });
+    const res = await pushToOverloop({ execution: ovl.execution, enroll: true });
     expect(res.blocked).toBe(1);
     expect(ovl.calls.some((c) => c.url.includes('enrollments'))).toBe(false);
     expect(one<any>('SELECT COUNT(*) n FROM audit WHERE allowed = 0').n).toBe(1);

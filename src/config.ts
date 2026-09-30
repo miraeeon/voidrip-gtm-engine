@@ -21,11 +21,13 @@ const dayList = z
 const EnvSchema = z.object({
   // --- platform credentials ---
   MAX_API_KEY: z
-    .string({ error: 'MAX_API_KEY missing — get it in Max: Settings → API Keys (run `npm run setup`)' })
-    .min(10, 'MAX_API_KEY looks too short — check the value in .env'),
+    .string()
+    .min(10, 'MAX_API_KEY looks too short — check the value in .env')
+    .optional(),
   OVERLOOP_API_KEY: z
-    .string({ error: 'OVERLOOP_API_KEY missing — get it in Overloop: Settings → API Keys (run `npm run setup`)' })
-    .min(10, 'OVERLOOP_API_KEY looks too short — check the value in .env'),
+    .string()
+    .min(10, 'OVERLOOP_API_KEY looks too short — check the value in .env')
+    .optional(),
   MAX_BUSINESS_ID: z.coerce.number().int().min(0).default(0).describe('0 = not chosen yet (run npm run setup)'),
   MAX_API_URL: z.string().url().default('https://api.yourmax.ai/api/v1'),
   OVERLOOP_API_URL: z.string().url().default('https://api.overloop.ai/public/v2'),

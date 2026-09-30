@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * GTM Autopilot MCP server (stdio). Exposes the full Max × Overloop GTM loop as tools
+ * GTM Autopilot MCP server (stdio). Exposes the provider-agnostic GTM loop as tools
  * so any MCP client — Claude Code, Claude Desktop, Codex, Cursor — can run it with
  * its own model as the brain.
  */
@@ -12,7 +12,7 @@ import { TOOLS } from '../tools.js';
 import { getPlaybook } from '../pipeline/playbook.js';
 import { status } from '../pipeline/report.js';
 
-const INSTRUCTIONS = `GTM Autopilot: Max (yourmax.ai) finds in-market leads from buying signals; Overloop (overloop.ai) runs email + LinkedIn outreach; you are the brain in between.
+const INSTRUCTIONS = `GTM Autopilot: SourceAdapter supplies candidates; ExecutionAdapter manages outbound drafts, activation and results. Max and Overloop are optional bundled adapters; you are the brain in between.
 Daily loop: gtm_sync_results -> gtm_get_performance -> gtm_save_learnings -> gtm_source_leads -> gtm_get_classification_queue -> gtm_save_classifications -> gtm_get_drafting_queue -> gtm_save_sequence (draft, critique, final) -> gtm_push_to_overloop -> gtm_verify_overloop -> gtm_write_report.
 Rules: the lead's buying signal is the hook of the first touch; every message must be specific to one person; never invent facts; no signatures (Overloop adds them).
 Safety: SEND_MODE=${safeMode()} — in locked mode campaigns are inert drafts and enrollment is blocked in code. Never try to work around the SafetyGuard.`;

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import { z } from 'zod';
 import { businessId as configuredBusinessId, ENV_FILE, getConfig } from '../config.js';
-import { MaxClient } from '../clients/max.js';
-import { OverloopClient } from '../clients/overloop.js';
+import type { ExecutionAdapter } from '../adapters/execution.js';
+import { createDefaultExecutionAdapter, createDefaultManagedSourceAdapter } from '../adapters/runtime.js';
+import type { ManagedSourceAdapter } from '../adapters/source.js';
 import { auditSink, kvGet, kvSet, logRun } from '../db/db.js';
 
 export const SellerProfile = z.object({
@@ -32,23 +33,25 @@ export function setSellerProfile(patch: Partial<SellerProfile>, businessId = get
 }
 
 /** Pull the business + ICP from Max and cache it as the seller profile (keeps user-edited fields). */
-export async function syncSellerFromMax(opts: { businessId?: number; max?: MaxClient } = {}) {
+export async function syncSellerFromSource(opts: { businessId?: number; source?: ManagedSourceAdapter } = {}) {
   const businessId = opts.businessId ?? configuredBusinessId();
-  const biz = await (opts.max ?? new MaxClient()).getBusiness(businessId);
+  const biz = await (opts.source ?? createDefaultManagedSourceAdapter()).getBusiness(businessId);
   return setSellerProfile(
     { company: biz.name, website: biz.website, description: biz.description, icp: biz.ideal_customer_profile ?? null },
     businessId,
   );
 }
 
+export const syncSellerFromMax = syncSellerFromSource;
+
 /** Health check for both platforms + local state. Read-only. */
-export async function doctor() {
+export async function doctor(opts: { source?: ManagedSourceAdapter; execution?: ExecutionAdapter } = {}) {
   const cfg = getConfig();
   const out: Record<string, unknown> = { send_mode: cfg.SEND_MODE, business_id: cfg.MAX_BUSINESS_ID };
   try {
-    const max = new MaxClient();
-    const biz = await max.getBusiness(configuredBusinessId());
-    const subs = await max.listSubscriptions(configuredBusinessId());
+    const source = opts.source ?? createDefaultManagedSourceAdapter();
+    const biz = await source.getBusiness(configuredBusinessId());
+    const subs = await source.listSubscriptions(configuredBusinessId());
     out.max = {
       ok: true,
       business: `${biz.name} (${biz.website})`,
@@ -60,14 +63,12 @@ export async function doctor() {
     out.max = { ok: false, error: (e as Error).message };
   }
   try {
-    const ovl = new OverloopClient({ audit: auditSink });
-    const me = await ovl.me();
-    const senders = await ovl.listSendingAddresses();
+    const account = await (opts.execution ?? createDefaultExecutionAdapter(auditSink)).getAccount();
     out.overloop = {
       ok: true,
-      user: `${me.name} <${me.email}>`,
-      sending_addresses: senders.data.length,
-      working_senders: senders.data.filter((s) => s.working).length,
+      user: `${account.user.name} <${account.user.email}>`,
+      sending_addresses: account.sendingIdentities.length,
+      working_senders: account.sendingIdentities.filter((identity) => identity.working).length,
     };
   } catch (e) {
     out.overloop = { ok: false, error: (e as Error).message };
@@ -77,18 +78,18 @@ export async function doctor() {
 }
 
 /** Onboard a company: create (or reuse) the Max business from its website and remember it in .env. */
-export async function init(opts: { website?: string; businessId?: number }) {
-  const max = new MaxClient();
+export async function init(opts: { website?: string; businessId?: number; source?: ManagedSourceAdapter }) {
+  const source = opts.source ?? createDefaultManagedSourceAdapter();
   let businessId = opts.businessId;
   if (!businessId && opts.website) {
     const host = new URL(opts.website.startsWith('http') ? opts.website : `https://${opts.website}`).hostname.replace(/^www\./, '');
-    const existing = (await max.listBusinesses()).find((b) => (b.website ?? '').includes(host));
-    businessId = existing ? existing.id : (await max.createBusiness({ website: `https://${host}` })).id;
+    const existing = (await source.listBusinesses()).find((business) => (business.website ?? '').includes(host));
+    businessId = existing ? existing.id : (await source.createBusiness({ website: `https://${host}` })).id;
   }
   businessId ??= configuredBusinessId();
   writeEnvVar('MAX_BUSINESS_ID', String(businessId));
   process.env.MAX_BUSINESS_ID = String(businessId);
-  const seller = await syncSellerFromMax({ businessId, max });
+  const seller = await syncSellerFromSource({ businessId, source });
   logRun('init', { businessId });
   return { business_id: businessId, seller, next: 'Review the ICP (gtm setup), fill in value_proposition/proof_points/primary_cta (gtm seller --set), then add signal subscriptions.' };
 }

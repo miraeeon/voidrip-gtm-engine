@@ -445,7 +445,7 @@ Run through `node bin/gtm.mjs …`, the alias from step 1, or `npm link` once fo
 
 | Group | Key settings (default) |
 |---|---|
-| **Keys** | `MAX_API_KEY`, `OVERLOOP_API_KEY`, `MAX_BUSINESS_ID` (set by setup) |
+| **Bundled adapters** | `MAX_API_KEY`, `OVERLOOP_API_KEY`, `MAX_BUSINESS_ID` (only required when using the bundled Max/Overloop adapters) |
 | **Safety** | `SEND_MODE` (`locked`), `OVERLOOP_NAME_PREFIX` (`[GTM-BOT]`) |
 | **Schedule** | `GTM_SCHEDULE_TIME` (`08:00`), `GTM_SCHEDULE_DAYS` (`MON…FRI`), `GTM_AGENT_CMD` (`claude`), `GTM_MODEL` (`claude-opus-5-5`), `GTM_RUN_TIMEOUT_MIN` (`90`) |
 | **Daily volume** | `GTM_DAILY_NEW_LEADS` (`40`), `GTM_DAILY_SEQUENCES` (`25`), `GTM_DAILY_PUSH_LIMIT` (`25`), `GTM_SOURCE_MAX_PAGES` (`10`) |
@@ -503,7 +503,8 @@ npx tsx scripts/safety-check.ts   # live negative test on your Overloop: tries t
 | max: `422 Active can only be enabled once your subscription is active` | The business has no active plan, so subscriptions can't be switched on. Activate a plan in max, or run `gtm init --business <id>` for one that has one. `gtm doctor` shows active subscriptions. |
 | Overloop: `Your API key is wrong` | Overloop expects the raw key in `Authorization` (no `Bearer`). Check `.env` for quotes or trailing spaces. |
 | No new leads from max | Signals are watched asynchronously, so a fresh subscription can take hours. Check `gtm setup` for active subscriptions, and add `atlas-icp` (ICP matches) to top up. |
-| `MAX_API_KEY missing` | Run `npm run setup`, or fill `.env` from `.env.example`. |
+| `Max adapter is not configured` | Run `npm run setup`, fill `MAX_API_KEY`, or inject another `SourceAdapter`. |
+| `Overloop adapter is not configured` | Fill `OVERLOOP_API_KEY`, or inject another `ExecutionAdapter`. |
 | A reply shows up without text | Connect a Gmail or Outlook MCP, or paste it with `gtm reply-add --lead <id> --text "…"`. |
 | Too many campaigns in Overloop | Lower `GTM_DAILY_PUSH_LIMIT`, and use `gtm cleanup` (dry run) then `gtm cleanup --yes` to remove bot-created test objects. |
 | Do I need an Anthropic or OpenAI API key? | No. The agent you already run is the model. The engine never calls a model API. |

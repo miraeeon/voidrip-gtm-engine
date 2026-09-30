@@ -7,12 +7,14 @@ All settings live in `.env` at the repo root (or the file named by `GTM_ENV_FILE
 
 Changes take effect on the next command, with one exception: **schedule** changes need `npm run schedule` to be re-registered with the OS.
 
-## Platform credentials
+## Bundled adapter credentials
+
+The engine, SQLite store and MCP server start without provider credentials. These values become required only when the corresponding bundled adapter is invoked.
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAX_API_KEY` | **required** | Max API key (*Settings → API Keys*). Sent as `Authorization: Bearer …` |
-| `OVERLOOP_API_KEY` | **required** | Overloop API key (*Settings → API Keys*). Sent raw in `Authorization` |
+| `MAX_API_KEY` | – | Required by the bundled Max `SourceAdapter`. Sent as `Authorization: Bearer …` |
+| `OVERLOOP_API_KEY` | – | Required by the bundled Overloop `ExecutionAdapter`. Sent raw in `Authorization` |
 | `MAX_BUSINESS_ID` | set by setup | The Max business (your company) the loop runs for |
 | `MAX_API_URL` | `https://api.yourmax.ai/api/v1` | Override only for testing |
 | `OVERLOOP_API_URL` | `https://api.overloop.ai/public/v2` | Override only for testing |

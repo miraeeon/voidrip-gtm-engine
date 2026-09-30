@@ -1,66 +1,21 @@
 import { getConfig, toMinutes } from '../config.js';
-
-const DAY_NAMES: Record<string, string> = {
-  MON: 'monday', TUE: 'tuesday', WED: 'wednesday', THU: 'thursday', FRI: 'friday', SAT: 'saturday', SUN: 'sunday',
-};
-import { OverloopClient, type OvlProspect } from '../clients/overloop.js';
-import { ApiError } from '../clients/http.js';
+import type { ExecutionAdapter, ExecutionProspect } from '../adapters/execution.js';
+import { createDefaultExecutionAdapter } from '../adapters/runtime.js';
 import { SafetyError } from '../safety/guard.js';
 import { all, auditSink, logRun, nowIso, one, run, today } from '../db/db.js';
-import type { Step } from './sequence.js';
-
-export function textToHtml(body: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return body
-    .trim()
-    .split(/\n\s*\n/)
-    .map((para) => `<p>${esc(para).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-}
-
-/** Translate our channel-agnostic steps into Overloop inline campaign steps (with delay steps). */
-export function toOverloopSteps(steps: Step[]): { type: string; config: Record<string, unknown> }[] {
-  const out: { type: string; config: Record<string, unknown> }[] = [];
-  for (const s of steps) {
-    if (s.delay_days > 0) out.push({ type: 'delay', config: { days_delay: s.delay_days } });
-    switch (s.type) {
-      case 'email':
-        out.push({ type: 'email', config: { generate_with_ai: false, subject: s.subject, content: textToHtml(s.body) } });
-        break;
-      case 'linkedin_visit':
-        out.push({ type: 'linkedin_visit_profile', config: {} });
-        break;
-      case 'linkedin_invite':
-        out.push({ type: 'linkedin_send_invitation', config: { generate_with_ai: false, message: s.note } });
-        break;
-      case 'linkedin_message':
-        out.push({ type: 'linkedin_send_message', config: { generate_with_ai: false, message: s.message } });
-        break;
-    }
-  }
-  return out;
-}
+import { Step } from './sequence.js';
 
 export function campaignName(prefix: string, lead: { name: string | null; company: string | null }, route: string, date = today()): string {
   const who = [lead.name, lead.company].filter(Boolean).join(' @ ') || 'lead';
   return `${prefix} ${date} · ${who} · ${route}`.slice(0, 190);
 }
 
-/** Inert campaign settings. SendGuard also enforces these, this is belt and braces. */
-export const INERT_CAMPAIGN = {
-  status: 'off',
-  only_allow_manual_enrollment: true,
-  automatically_send_messages: false,
-  automatically_send_follow_ups: false,
-  automatically_reenroll: false,
-} as const;
-
 export interface PushOptions {
   limit?: number;
   leadIds?: number[];
   /** Attempt enrollment after creating the campaign. Blocked by SendGuard unless SEND_MODE=live. */
   enroll?: boolean;
-  client?: OverloopClient;
+  execution?: ExecutionAdapter;
 }
 
 export interface PushItem {
@@ -75,7 +30,7 @@ export interface PushItem {
 
 export async function pushToOverloop(opts: PushOptions = {}) {
   const cfg = getConfig();
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const filter = opts.leadIds?.length ? `AND l.id IN (${opts.leadIds.map(Number).join(',')})` : '';
   const pushedToday = one<{ n: number }>(`SELECT COUNT(*) n FROM pushes WHERE substr(pushed_at,1,10) = ?`, today())?.n ?? 0;
   const capLeft = Math.max(0, cfg.GTM_DAILY_PUSH_LIMIT - pushedToday);
@@ -95,7 +50,7 @@ export async function pushToOverloop(opts: PushOptions = {}) {
   const items: PushItem[] = [];
   for (const lead of rows) {
     try {
-      items.push(await pushOne(client, lead, cfg, opts.enroll === true));
+      items.push(await pushOne(execution, lead, cfg, opts.enroll === true));
     } catch (e) {
       const blocked = e instanceof SafetyError;
       items.push({ lead_id: lead.id, status: blocked ? 'blocked' : 'error', reason: (e as Error).message });
@@ -119,11 +74,12 @@ export async function pushToOverloop(opts: PushOptions = {}) {
   return summary;
 }
 
-async function pushOne(client: OverloopClient, lead: any, cfg: ReturnType<typeof getConfig>, enroll: boolean): Promise<PushItem> {
+async function pushOne(execution: ExecutionAdapter, lead: any, cfg: ReturnType<typeof getConfig>, enroll: boolean): Promise<PushItem> {
   // 1. Resolve the prospect (never duplicate, never hijack an active conversation).
-  let prospect: OvlProspect | null = null;
-  if (lead.email) prospect = await client.findProspectByEmail(lead.email);
-  if (!prospect && lead.linkedin_url) prospect = await client.findProspectByLinkedin(lead.linkedin_url);
+  let prospect: ExecutionProspect | null = await execution.findProspect({
+    email: lead.email,
+    linkedinUrl: lead.linkedin_url,
+  });
   if (prospect && (prospect.replied || prospect.excluded)) {
     run(`UPDATE leads SET status = 'duplicate' WHERE id = ?`, lead.id);
     return {
@@ -135,42 +91,28 @@ async function pushOne(client: OverloopClient, lead: any, cfg: ReturnType<typeof
   }
   let created = false;
   if (!prospect) {
-    const attrs: Record<string, unknown> = {
-      first_name: lead.first_name ?? undefined,
-      last_name: lead.last_name ?? undefined,
-      jobtitle: lead.job_title ?? undefined,
-      linkedin_profile: lead.linkedin_url ?? undefined,
-      description: `Sourced by GTM Autopilot from Max signal "${lead.signal_name ?? lead.signal_slug}" (lead #${lead.id}).`,
-    };
-    if (lead.email) attrs.email = lead.email;
-    prospect = await client.createProspect(attrs);
+    prospect = await execution.createProspect({
+      email: lead.email,
+      linkedinUrl: lead.linkedin_url,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      jobTitle: lead.job_title,
+      sourceSummary: `signal "${lead.signal_name ?? lead.signal_slug}" (lead #${lead.id})`,
+    });
     created = true;
   }
 
   // 2. One inert draft campaign per lead holding the literal, lead-specific copy.
-  const steps = toOverloopSteps(JSON.parse(lead.steps_json));
   const name = campaignName(cfg.OVERLOOP_NAME_PREFIX, lead, lead.seq_route);
-  const body: Record<string, unknown> = {
+  const campaign = await execution.pushDraft({
     name,
     timezone: cfg.OVERLOOP_TIMEZONE,
-    sending_days: cfg.OVERLOOP_SENDING_DAYS.map((d) => DAY_NAMES[d]),
-    start_sending_minutes: toMinutes(cfg.OVERLOOP_SEND_START),
-    end_sending_minutes: toMinutes(cfg.OVERLOOP_SEND_END),
-    ...INERT_CAMPAIGN,
-    steps,
-  };
-  if (cfg.OVERLOOP_SENDER_ID) body.sender_id = Number(cfg.OVERLOOP_SENDER_ID);
-  let campaign;
-  try {
-    campaign = await client.createCampaign(body);
-  } catch (e) {
-    // Some accounts reject unknown automation flags; retry with the minimum inert set.
-    if (e instanceof ApiError && e.status === 422) {
-      const { automatically_send_messages, automatically_send_follow_ups, automatically_reenroll, ...minimal } = body;
-      void automatically_send_messages, automatically_send_follow_ups, automatically_reenroll;
-      campaign = await client.createCampaign(minimal);
-    } else throw e;
-  }
+    sendingDays: cfg.OVERLOOP_SENDING_DAYS,
+    startSendingMinutes: toMinutes(cfg.OVERLOOP_SEND_START),
+    endSendingMinutes: toMinutes(cfg.OVERLOOP_SEND_END),
+    senderId: cfg.OVERLOOP_SENDER_ID ? Number(cfg.OVERLOOP_SENDER_ID) : undefined,
+    steps: Step.array().parse(JSON.parse(lead.steps_json)),
+  });
 
   run(
     `INSERT INTO pushes(lead_id, sequence_id, ovl_prospect_id, prospect_created, ovl_campaign_id, campaign_name, send_mode, enrolled, pushed_at)
@@ -188,7 +130,7 @@ async function pushOne(client: OverloopClient, lead: any, cfg: ReturnType<typeof
 
   // 3. Enrollment is the only step that can send. SendGuard blocks it unless SEND_MODE=live.
   if (enroll) {
-    await client.createEnrollment(campaign.id, prospect.id, { allowSend: cfg.SEND_MODE === 'live' });
+    await execution.enroll(campaign.id, prospect.id, cfg.SEND_MODE === 'live');
     run('UPDATE pushes SET enrolled = 1 WHERE ovl_campaign_id = ?', campaign.id);
   }
 
@@ -230,9 +172,9 @@ export function reviewQueue(limit = 25) {
  * Requires SEND_MODE=live, human approval (approved_at), and confirm === "SEND".
  * In locked mode every attempt is blocked (and audited) by the SendGuard.
  */
-export async function launchApproved(opts: { leadIds?: number[]; confirm?: string; client?: OverloopClient } = {}) {
+export async function launchApproved(opts: { leadIds?: number[]; confirm?: string; execution?: ExecutionAdapter } = {}) {
   const cfg = getConfig();
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   if (opts.confirm !== 'SEND') {
     return { launched: 0, items: [], note: 'Nothing launched. Pass confirm: "SEND" to launch approved campaigns (requires SEND_MODE=live).' };
   }
@@ -242,14 +184,12 @@ export async function launchApproved(opts: { leadIds?: number[]; confirm?: strin
   for (const p of rows) {
     try {
       // Re-check right before sending: never enroll someone who replied or got excluded meanwhile.
-      const pr = await client.getProspect(p.ovl_prospect_id);
+      const pr = await execution.getProspect(p.ovl_prospect_id);
       if (pr.replied || pr.excluded || pr.bounced) {
         items.push({ lead_id: p.lead_id, status: 'skipped', reason: pr.replied ? 'already replied' : pr.excluded ? 'excluded' : 'bounced' });
         continue;
       }
-      const allow = { allowSend: cfg.SEND_MODE === 'live' };
-      await client.createEnrollment(p.ovl_campaign_id, p.ovl_prospect_id, allow);
-      await client.updateCampaign(p.ovl_campaign_id, { status: 'on' }, allow);
+      await execution.activate(p.ovl_campaign_id, p.ovl_prospect_id, cfg.SEND_MODE === 'live');
       run('UPDATE pushes SET enrolled = 1, launched_at = ? WHERE id = ?', nowIso(), p.id);
       items.push({ lead_id: p.lead_id, status: 'launched' });
     } catch (e) {
@@ -269,16 +209,20 @@ export async function launchApproved(opts: { leadIds?: number[]; confirm?: strin
 }
 
 /** Verify what we created in Overloop is still inert: status off/draft and zero enrollments. */
-export async function verifyPushes(opts: { client?: OverloopClient; limit?: number } = {}) {
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+export async function verifyPushes(opts: { execution?: ExecutionAdapter; limit?: number } = {}) {
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const rows = all<any>(`SELECT * FROM pushes WHERE deleted_at IS NULL AND launched_at IS NULL ORDER BY id DESC LIMIT ?`, opts.limit ?? 25);
   const checks = [];
   for (const p of rows) {
     try {
-      const c = await client.getCampaign(p.ovl_campaign_id);
-      const enr = await client.listEnrollments(p.ovl_campaign_id);
-      const enrollments = enr.pagination?.total ?? enr.data.length;
-      checks.push({ campaign_id: p.ovl_campaign_id, name: c.name, status: c.status, enrollments, inert: (c.status === 'off' || c.status === 'draft') && enrollments === 0 });
+      const verification = await execution.verifyDraft(p.ovl_campaign_id);
+      checks.push({
+        campaign_id: p.ovl_campaign_id,
+        name: verification.campaign.name,
+        status: verification.campaign.status,
+        enrollments: verification.enrollments,
+        inert: verification.inert,
+      });
     } catch (e) {
       checks.push({ campaign_id: p.ovl_campaign_id, error: (e as Error).message });
     }
@@ -287,8 +231,8 @@ export async function verifyPushes(opts: { client?: OverloopClient; limit?: numb
 }
 
 /** Delete everything the bot created in Overloop (campaigns + prospects it created). */
-export async function cleanupOverloop(opts: { client?: OverloopClient; dryRun?: boolean } = {}) {
-  const client = opts.client ?? new OverloopClient({ audit: auditSink });
+export async function cleanupOverloop(opts: { execution?: ExecutionAdapter; dryRun?: boolean } = {}) {
+  const execution = opts.execution ?? createDefaultExecutionAdapter(auditSink);
   const prefix = getConfig().OVERLOOP_NAME_PREFIX;
   const rows = all<any>('SELECT * FROM pushes WHERE deleted_at IS NULL');
   const out: { campaign_id: number; prospect_id: number | null; deleted: boolean; error?: string }[] = [];
@@ -299,13 +243,9 @@ export async function cleanupOverloop(opts: { client?: OverloopClient; dryRun?: 
       continue;
     }
     try {
-      await client.deleteCampaign(p.ovl_campaign_id).catch((e) => {
-        if (!(e instanceof ApiError && e.status === 404)) throw e;
-      });
+      await execution.deleteDraft(p.ovl_campaign_id);
       if (p.prospect_created) {
-        await client.deleteProspect(p.ovl_prospect_id).catch((e) => {
-          if (!(e instanceof ApiError && e.status === 404)) throw e;
-        });
+        await execution.deleteProspect(p.ovl_prospect_id);
       }
       run('UPDATE pushes SET deleted_at = ? WHERE id = ?', nowIso(), p.id);
       run(`UPDATE leads SET status = 'final' WHERE id = ? AND status = 'pushed'`, p.lead_id);

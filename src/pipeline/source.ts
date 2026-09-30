@@ -1,6 +1,7 @@
 import { businessId as configuredBusinessId, getConfig } from '../config.js';
-import { MaxClient, type MaxLead, type MaxSignal } from '../clients/max.js';
-import { normLinkedin } from '../clients/overloop.js';
+import { createDefaultManagedSourceAdapter, createDefaultSourceAdapter } from '../adapters/runtime.js';
+import type { ManagedSourceAdapter, SourceAdapter, SourceCandidate, SourceSignal } from '../adapters/source.js';
+import { normalizeLinkedinUrl } from '../identity/linkedin.js';
 import { all, getDb, kvSet, logRun, nowIso, one, run, today, tx } from '../db/db.js';
 import { getWeights } from './weights.js';
 
@@ -12,13 +13,13 @@ export function splitName(full: string | null): { first: string | null; last: st
   return { first: parts[0]!, last: parts.slice(1).join(' ') };
 }
 
-export function dedupeKey(lead: Pick<MaxLead, 'email' | 'linkedin_url' | 'name' | 'company'>): string {
+export function dedupeKey(lead: Pick<SourceCandidate, 'email' | 'linkedin_url' | 'name' | 'company'>): string {
   if (lead.email) return `email:${lead.email.trim().toLowerCase()}`;
-  if (lead.linkedin_url) return `li:${normLinkedin(lead.linkedin_url)}`;
+  if (lead.linkedin_url) return `li:${normalizeLinkedinUrl(lead.linkedin_url)}`;
   return `name:${(lead.name ?? '').toLowerCase()}|${(lead.company ?? '').toLowerCase()}`;
 }
 
-export function leadToRow(lead: MaxLead, businessId: number, runDate: string) {
+export function leadToRow(lead: SourceCandidate, businessId: number, runDate: string) {
   const { first, last } = splitName(lead.name);
   const p = lead.payload ?? {};
   const signal = lead.signals?.[0];
@@ -66,12 +67,12 @@ export interface SourceResult {
   note?: string;
 }
 
-export async function sourceLeads(opts: { businessId?: number; maxPages?: number; max?: MaxClient } = {}): Promise<SourceResult> {
+export async function sourceLeads(opts: { businessId?: number; maxPages?: number; source?: SourceAdapter } = {}): Promise<SourceResult> {
   const businessId = opts.businessId ?? configuredBusinessId();
-  const max = opts.max ?? new MaxClient();
+  const source = opts.source ?? createDefaultSourceAdapter();
   const runDate = today();
   const known = new Set(all<{ id: number }>('SELECT id FROM leads WHERE business_id = ?', businessId).map((r) => r.id));
-  const fresh = await max.listNewLeads(businessId, (id) => known.has(id), opts.maxPages ?? 10);
+  const fresh = await source.listCandidates({ scopeId: businessId, knownIds: known, maxPages: opts.maxPages ?? 10 });
 
   const stmt = getDb().prepare(`INSERT OR IGNORE INTO leads (
     id, business_id, external_id, name, first_name, last_name, headline, job_title, email, phone, linkedin_url, location,
@@ -103,7 +104,7 @@ export async function sourceLeads(opts: { businessId?: number; maxPages?: number
   const result: SourceResult = { business_id: businessId, fetched: fresh.length, inserted, duplicates, by_signal: bySignal };
   if (fresh.length === 0) {
     result.note =
-      'No new leads from Max. Signals are monitored asynchronously — check `gtm setup` to confirm active subscriptions, then re-run later.';
+      `No new leads from ${source.getSourceMetadata().provider}. Check the configured source, then re-run later.`;
   }
   logRun('source', result);
   return result;
@@ -118,13 +119,13 @@ export interface SetupView {
   leads_in_db: number;
 }
 
-export async function getSetup(opts: { businessId?: number; max?: MaxClient; includeCatalog?: boolean } = {}): Promise<SetupView> {
+export async function getSetup(opts: { businessId?: number; source?: ManagedSourceAdapter; includeCatalog?: boolean } = {}): Promise<SetupView> {
   const businessId = opts.businessId ?? configuredBusinessId();
-  const max = opts.max ?? new MaxClient();
+  const source = opts.source ?? createDefaultManagedSourceAdapter();
   const [biz, subs, signals] = await Promise.all([
-    max.getBusiness(businessId),
-    max.listSubscriptions(businessId),
-    opts.includeCatalog === false ? Promise.resolve([] as MaxSignal[]) : max.listSignals(),
+    source.getBusiness(businessId),
+    source.listSubscriptions(businessId),
+    opts.includeCatalog === false ? Promise.resolve([] as SourceSignal[]) : source.listSignals(),
   ]);
   const weights = getWeights('signal:');
   return {
@@ -157,22 +158,22 @@ export async function ensureSubscription(input: {
   name: string;
   config?: Record<string, unknown>;
   businessId?: number;
-  max?: MaxClient;
+  source?: ManagedSourceAdapter;
 }) {
   const businessId = input.businessId ?? configuredBusinessId();
-  const max = input.max ?? new MaxClient();
-  const existing = (await max.listSubscriptions(businessId)).find(
+  const source = input.source ?? createDefaultManagedSourceAdapter();
+  const existing = (await source.listSubscriptions(businessId)).find(
     (s) => s.signal.slug === input.signal_slug && JSON.stringify(s.config ?? {}) === JSON.stringify(input.config ?? {}),
   );
   if (existing) {
     if (!existing.active) {
-      await max.resumeSubscription(businessId, existing.id);
+      await source.resumeSubscription(businessId, existing.id);
       logRun('subscription', { action: 'resumed', id: existing.id, signal: input.signal_slug });
       return { action: 'resumed', id: existing.id };
     }
     return { action: 'exists', id: existing.id };
   }
-  const created = await max.createSubscription(businessId, {
+  const created = await source.createSubscription(businessId, {
     signal_slug: input.signal_slug,
     name: input.name,
     config: input.config,
@@ -182,9 +183,24 @@ export async function ensureSubscription(input: {
   return { action: 'created', id: created.id };
 }
 
-export async function pauseSubscription(id: number, opts: { businessId?: number; max?: MaxClient } = {}) {
+export async function pauseSubscription(id: number, opts: { businessId?: number; source?: ManagedSourceAdapter } = {}) {
   const businessId = opts.businessId ?? configuredBusinessId();
-  await (opts.max ?? new MaxClient()).pauseSubscription(businessId, id);
+  await (opts.source ?? createDefaultManagedSourceAdapter()).pauseSubscription(businessId, id);
   logRun('subscription', { action: 'paused', id });
   return { action: 'paused', id };
+}
+
+export async function resumeSubscription(id: number, opts: { businessId?: number; source?: ManagedSourceAdapter } = {}) {
+  const businessId = opts.businessId ?? configuredBusinessId();
+  await (opts.source ?? createDefaultManagedSourceAdapter()).resumeSubscription(businessId, id);
+  logRun('subscription', { action: 'resumed', id });
+  return { action: 'resumed', id };
+}
+
+export async function updateIcp(
+  icp: Record<string, unknown> & { id: number },
+  opts: { businessId?: number; source?: ManagedSourceAdapter } = {},
+) {
+  const businessId = opts.businessId ?? configuredBusinessId();
+  return (opts.source ?? createDefaultManagedSourceAdapter()).updateIcp(businessId, icp);
 }

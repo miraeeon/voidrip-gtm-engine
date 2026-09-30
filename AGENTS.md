@@ -20,3 +20,8 @@ node bin/gtm.mjs tool gtm_get_drafting_queue '{"limit":5}'
 ```
 
 Safety: `SEND_MODE=locked` is the default. Enrollment, activation and auto-send are blocked in code. Never try to work around this.
+
+Architecture:
+- `src/adapters/source.ts` and `src/adapters/execution.ts` are the stable provider ports.
+- Provider clients are implementation details and may only be imported by their adapter or composition boundary.
+- Core modules under `src/pipeline/` must depend on adapter contracts, never on Max, Overloop or another provider client.
