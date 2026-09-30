@@ -30,7 +30,7 @@ You do **not** need to add a model API key to this repository. The authenticated
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/miraeeon/gtm-autopilot.git voidrip-gtm-engine
+git clone https://github.com/miraeeon/voidrip-gtm-engine.git
 cd voidrip-gtm-engine
 npm ci                 # installs exact versions from package-lock.json
 codex mcp add voidrip-gtm-engine -- node "$PWD/bin/gtm-mcp.mjs"

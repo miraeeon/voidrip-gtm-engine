@@ -103,7 +103,7 @@ voidrip-gtm-engine/
 ### Step 1 - Get the code
 
 ```bash
-git clone https://github.com/miraeeon/gtm-autopilot.git voidrip-gtm-engine
+git clone https://github.com/miraeeon/voidrip-gtm-engine.git
 cd voidrip-gtm-engine
 npm ci
 codex mcp add voidrip-gtm-engine -- node "$PWD/bin/gtm-mcp.mjs"
