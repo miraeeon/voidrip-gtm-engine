@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getConfig } from '../config.js';
 import type { AuditEntry } from '../safety/guard.js';
+import { MARKET_MAP_SCHEMA } from './market-map-schema.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS leads (
@@ -169,6 +170,7 @@ export function openDb(file = getConfig().GTM_DB_PATH): DatabaseSync {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  db.exec(MARKET_MAP_SCHEMA);
   migrate(db);
   return db;
 }

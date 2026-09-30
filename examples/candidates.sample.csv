@@ -1,0 +1,2 @@
+source_record_id,person_name,professional_profile_url,email,headline,current_role,current_org,org_url,project_name_if_visible,project_url_if_visible,project_description_if_visible,evidence
+sample-m-1,Ari Example,https://www.linkedin.com/in/ari-example,,Founder and creative director,Founder,Example World Studio,https://example.invalid,Example World,https://example.invalid/world,A persistent narrative universe across film and interactive media,Professional profile links to the named project

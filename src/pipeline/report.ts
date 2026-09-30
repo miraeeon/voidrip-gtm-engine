@@ -15,6 +15,19 @@ export function status() {
     send_mode: cfg.SEND_MODE,
     business_id: cfg.MAX_BUSINESS_ID,
     leads: byStatus,
+    market_map: {
+      candidates: one<{ n: number }>('SELECT COUNT(*) n FROM candidates')?.n ?? 0,
+      by_state: Object.fromEntries(
+        all<{ state: string; n: number }>('SELECT state, COUNT(*) n FROM candidates GROUP BY state').map((row) => [row.state, row.n]),
+      ),
+      observations: one<{ n: number }>('SELECT COUNT(*) n FROM source_observations')?.n ?? 0,
+      projects: one<{ n: number }>('SELECT COUNT(*) n FROM projects')?.n ?? 0,
+      boundary_qualifications: one<{ n: number }>('SELECT COUNT(*) n FROM boundary_qualifications')?.n ?? 0,
+      activation_scores: one<{ n: number }>('SELECT COUNT(*) n FROM activation_scores')?.n ?? 0,
+      local_review: one<{ n: number }>(
+        `SELECT COUNT(*) n FROM candidate_sequences WHERE status = 'final' AND review_status = 'pending'`,
+      )?.n ?? 0,
+    },
     pushed_campaigns: one<{ n: number }>('SELECT COUNT(*) n FROM pushes WHERE deleted_at IS NULL')?.n ?? 0,
     enrolled: one<{ n: number }>('SELECT COUNT(*) n FROM pushes WHERE enrolled = 1')?.n ?? 0,
     outcomes: one<any>('SELECT COUNT(*) n, SUM(replied) replied, SUM(is_simulated) simulated FROM outcomes'),

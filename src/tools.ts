@@ -17,6 +17,7 @@ import { status, writeReport } from './pipeline/report.js';
 import { getDraftingQueue, SequenceInput, saveSequence } from './pipeline/sequence.js';
 import { doctor, getSellerProfile, init, SellerProfile, setSellerProfile, syncSellerFromSource } from './pipeline/setup.js';
 import { ensureSubscription, getSetup, pauseSubscription, resumeSubscription, sourceLeads, updateIcp } from './pipeline/source.js';
+import { MARKET_MAP_TOOLS } from './market-map/tools.js';
 
 export interface ToolDef<S extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
@@ -139,6 +140,7 @@ export const TOOLS: ToolDef[] = [
     input: { limit: z.number().int().min(1).max(500).default(200) },
     handler: (a) => enrichFromOverloop({ limit: a.limit }),
   }),
+  ...MARKET_MAP_TOOLS,
   def({
     name: 'gtm_get_classification_queue',
     title: 'Leads to classify',

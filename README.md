@@ -8,7 +8,7 @@
 ![Node 22.13+](https://img.shields.io/badge/node-22.13%2B-339933.svg)
 ![Runs on Codex](https://img.shields.io/badge/runs%20on-Codex-111827.svg)
 ![Leads from max](https://img.shields.io/badge/leads%20from-max-EE5D8B.svg)
-![MCP server](https://img.shields.io/badge/MCP-32%20tools-7c3aed.svg)
+![MCP server](https://img.shields.io/badge/MCP-42%20tools-7c3aed.svg)
 ![Send mode locked by default](https://img.shields.io/badge/send%20mode-locked%20by%20default-success.svg)
 
 **Max and Overloop are optional bundled adapters. [Codex](https://developers.openai.com/codex/) is the qualification and orchestration engine.**
@@ -81,7 +81,7 @@ voidrip-gtm-engine/
   AGENTS.md                   the repository rules Codex follows
   .mcp.json                   registers the voidrip-gtm-engine MCP server
   .agents/skills/             gtm-daily-loop, gtm-classify-route, gtm-write-sequence,
-                              gtm-replies, gtm-learn
+                              gtm-replies, gtm-learn, gtm-local-e2e
   data/playbook.md            tiers, routing and writing rules (seed; versions live in the database)
   bin/                        gtm.mjs (CLI) and gtm-mcp.mjs (MCP server), TypeScript run through tsx
   src/clients/                max.ts, overloop.ts, http.ts (rate limits, retries, 429 backoff)
@@ -89,7 +89,7 @@ voidrip-gtm-engine/
   src/db/db.ts                SQLite through node:sqlite, migrations run by themselves
   src/pipeline/               source, enrich, route, classify, sequence, push, results,
                               replies, analytics, learn, playbook, weights, report
-  src/tools.ts                32 tools, one registry shared by the MCP server and the CLI
+  src/tools.ts                42 tools, one registry shared by the MCP server and the CLI
   scripts/                    daily.sh, daily.ps1, schedule.ps1, safety-check.ts, mcp-smoke.mjs
   tests/                      guard, routing and lint, channel plans, replies and launch, full pipeline
 ```
@@ -384,7 +384,7 @@ gtm tool <name> [json]
 
 Run through `node bin/gtm.mjs …`, the alias from step 1, or `npm link` once for a global `gtm`.
 
-### The 32 tools
+### The 42 tools
 
 | Tool | What it does | Writes? |
 |---|---|---|
@@ -397,6 +397,16 @@ Run through `node bin/gtm.mjs …`, the alias from step 1, or `npm link` once fo
 | `gtm_seller_profile` | Get or set value prop, proof points, CTA, tone, language, do-not-say | local |
 | `gtm_source_leads` | Pull new max leads (deduped) and check them against Overloop | local |
 | `gtm_enrich_from_overloop` | Read-only lookup of each lead in Overloop | local |
+| `gtm_ingest_candidates` | Add a normalized CSV/JSON batch to the persistent Market Map | local |
+| `gtm_get_resolution_queue` | Candidates needing Person + Project resolution | no |
+| `gtm_save_project_resolution` | Save project identity, visibility, alignment and evidence | local |
+| `gtm_get_boundary_queue` | Resolved Person + Project records ready for GTM_BOUNDARY_V1 | no |
+| `gtm_save_boundary_qualifications` | Save PASS/HOLD/FAIL independently from intent | local |
+| `gtm_get_priority_queue` | PASS_OUTBOUND_V1 records needing intent and priority | no |
+| `gtm_save_activation_scores` | Save intent, freshness, priority, route and angle | local |
+| `gtm_get_market_drafting_queue` | Activation-ready records for local drafting | no |
+| `gtm_save_candidate_sequence` | Lint and version a local Person + Project sequence | local |
+| `gtm_get_market_review_queue` | Final local drafts awaiting human review | no |
 | `gtm_get_classification_queue` | Leads with evidence, seller profile, playbook, weights, learnings | no |
 | `gtm_save_classifications` | Tier, persona, intent, route, channel plan, angle; routing rules applied | local |
 | `gtm_get_drafting_queue` | Everything needed to write: evidence, plan, template, past winners, lint | no |
