@@ -6,6 +6,7 @@ export const UNATTENDED_TOOL_NAMES = new Set([
   'gtm_approve',
   'gtm_launch',
   'gtm_cleanup_overloop',
+  'gtm_push_to_overloop',
   'gtm_simulate_results',
   'gtm_simulate_replies',
   'gtm_manage_subscription',

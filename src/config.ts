@@ -50,9 +50,9 @@ const EnvSchema = z.object({
   OVERLOOP_SEND_END: hhmm.default('17:00'),
 
   // --- daily volume caps ---
-  GTM_DAILY_NEW_LEADS: z.coerce.number().int().min(0).default(40).describe('max leads classified per day'),
-  GTM_DAILY_SEQUENCES: z.coerce.number().int().min(0).default(25).describe('max sequences finalized per day'),
-  GTM_DAILY_PUSH_LIMIT: z.coerce.number().int().min(0).default(25).describe('max new Overloop campaigns per day'),
+  GTM_DAILY_NEW_LEADS: z.coerce.number().int().min(0).default(20).describe('target qualified prospects reviewed per day'),
+  GTM_DAILY_SEQUENCES: z.coerce.number().int().min(0).default(20).describe('max sequences finalized per day'),
+  GTM_DAILY_PUSH_LIMIT: z.coerce.number().int().min(0).default(20).describe('max provider imports per day after explicit approval'),
   GTM_SOURCE_MAX_PAGES: z.coerce.number().int().min(1).max(50).default(10),
   GTM_ENRICH_FROM_OVERLOOP: bool.default(true),
 

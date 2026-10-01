@@ -182,6 +182,10 @@ const MIGRATIONS: [table: string, column: string, ddl: string][] = [
   ['classifications', 'channel_plan_json', 'ALTER TABLE classifications ADD COLUMN channel_plan_json TEXT'],
   ['pushes', 'approved_at', 'ALTER TABLE pushes ADD COLUMN approved_at TEXT'],
   ['pushes', 'launched_at', 'ALTER TABLE pushes ADD COLUMN launched_at TEXT'],
+  ['candidates', 'external_id', 'ALTER TABLE candidates ADD COLUMN external_id TEXT'],
+  ['projects', 'external_id', 'ALTER TABLE projects ADD COLUMN external_id TEXT'],
+  ['boundary_qualifications', 'source_qualification_id', 'ALTER TABLE boundary_qualifications ADD COLUMN source_qualification_id TEXT'],
+  ['signal_events', 'source_signal_id', 'ALTER TABLE signal_events ADD COLUMN source_signal_id TEXT'],
 ];
 
 function migrate(db: DatabaseSync): void {

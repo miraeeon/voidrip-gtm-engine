@@ -36,7 +36,7 @@ export const TOOLS: ToolDef[] = [
     name: 'gtm_doctor',
     title: 'Health check',
     description:
-      'Health check: Max + Overloop connections, business, sending addresses, safety mode, Node version, database, agent CLI, schedule, daily caps, sending window and the last daily run. Run first.',
+      'Health check for the active Drive Market Map → Codex → local review → HeyReach path, safety mode, daily target, database, agent CLI and schedule. Legacy Max/Overloop are reported only when configured.',
     input: {},
     readOnly: true,
     handler: async () => ({ ...(await doctor()), system: systemChecks() }),

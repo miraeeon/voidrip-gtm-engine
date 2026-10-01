@@ -23,10 +23,12 @@ export function status() {
       observations: one<{ n: number }>('SELECT COUNT(*) n FROM source_observations')?.n ?? 0,
       projects: one<{ n: number }>('SELECT COUNT(*) n FROM projects')?.n ?? 0,
       boundary_qualifications: one<{ n: number }>('SELECT COUNT(*) n FROM boundary_qualifications')?.n ?? 0,
+      signals: one<{ n: number }>('SELECT COUNT(*) n FROM signal_events')?.n ?? 0,
       activation_scores: one<{ n: number }>('SELECT COUNT(*) n FROM activation_scores')?.n ?? 0,
       local_review: one<{ n: number }>(
         `SELECT COUNT(*) n FROM candidate_sequences WHERE status = 'final' AND review_status = 'pending'`,
       )?.n ?? 0,
+      daily_review_target: cfg.GTM_DAILY_SEQUENCES,
     },
     pushed_campaigns: one<{ n: number }>('SELECT COUNT(*) n FROM pushes WHERE deleted_at IS NULL')?.n ?? 0,
     enrolled: one<{ n: number }>('SELECT COUNT(*) n FROM pushes WHERE enrolled = 1')?.n ?? 0,

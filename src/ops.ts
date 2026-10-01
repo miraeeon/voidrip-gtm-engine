@@ -20,6 +20,7 @@ export const UNATTENDED_DENY = [
   'mcp__voidrip-gtm-engine__gtm_approve',
   'mcp__voidrip-gtm-engine__gtm_launch',
   'mcp__voidrip-gtm-engine__gtm_cleanup_overloop',
+  'mcp__voidrip-gtm-engine__gtm_push_to_overloop',
   'mcp__voidrip-gtm-engine__gtm_simulate_results',
   'mcp__voidrip-gtm-engine__gtm_simulate_replies',
   'mcp__voidrip-gtm-engine__gtm_manage_subscription',
@@ -267,8 +268,8 @@ export function systemChecks() {
     database: { path: cfg.GTM_DB_PATH, tables: dbTables, ok: dbTables >= 10, backups },
     agent_cli: { cmd: cfg.GTM_AGENT_CMD, ok: agent.status === 0, version: (agent.stdout ?? '').trim().split('\n')[0] || undefined },
     schedule: { enabled: cfg.GTM_SCHEDULE_ENABLED, days: cfg.GTM_SCHEDULE_DAYS, time: cfg.GTM_SCHEDULE_TIME, ...scheduleStatus() },
-    caps: { new_leads: cfg.GTM_DAILY_NEW_LEADS, sequences: cfg.GTM_DAILY_SEQUENCES, pushes: cfg.GTM_DAILY_PUSH_LIMIT },
-    sending_window: { days: cfg.OVERLOOP_SENDING_DAYS, from: cfg.OVERLOOP_SEND_START, to: cfg.OVERLOOP_SEND_END, timezone: cfg.OVERLOOP_TIMEZONE },
+    caps: { daily_review_target: cfg.GTM_DAILY_NEW_LEADS, sequences: cfg.GTM_DAILY_SEQUENCES, provider_imports_after_approval: cfg.GTM_DAILY_PUSH_LIMIT },
+    execution: { provider: 'heyreach', campaign_id: cfg.HEYREACH_CAMPAIGN_ID, send_mode: cfg.SEND_MODE },
     last_daily_run: lastDaily ? { at: lastDaily.at, ...JSON.parse(lastDaily.summary_json) } : null,
   };
 }

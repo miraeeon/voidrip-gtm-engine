@@ -69,7 +69,7 @@ describe('ops', () => {
   });
 
   it('removes sensitive tools from unattended MCP runtimes', () => {
-    for (const name of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop']) {
+    for (const name of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop', 'gtm_push_to_overloop']) {
       expect(UNATTENDED_TOOL_NAMES).toContain(name);
       expect(toolAllowedInRuntime(name, true)).toBe(false);
       expect(toolAllowedInRuntime(name, false)).toBe(true);

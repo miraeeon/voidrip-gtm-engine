@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { businessId as configuredBusinessId, ENV_FILE, getConfig } from '../config.js';
 import type { ExecutionAdapter } from '../adapters/execution.js';
-import { createDefaultExecutionAdapter, createDefaultManagedSourceAdapter } from '../adapters/runtime.js';
+import { createDefaultExecutionAdapter, createDefaultHeyReachAdapter, createDefaultManagedSourceAdapter } from '../adapters/runtime.js';
 import type { ManagedSourceAdapter } from '../adapters/source.js';
-import { auditSink, kvGet, kvSet, logRun } from '../db/db.js';
+import { auditSink, kvGet, kvSet, logRun, one } from '../db/db.js';
 
 export const SellerProfile = z.object({
   company: z.string().min(1),
@@ -44,36 +44,57 @@ export async function syncSellerFromSource(opts: { businessId?: number; source?:
 
 export const syncSellerFromMax = syncSellerFromSource;
 
-/** Health check for both platforms + local state. Read-only. */
+/** Health check for the active VOIDRIP path; legacy providers remain optional. Read-only. */
 export async function doctor(opts: { source?: ManagedSourceAdapter; execution?: ExecutionAdapter } = {}) {
   const cfg = getConfig();
-  const out: Record<string, unknown> = { send_mode: cfg.SEND_MODE, business_id: cfg.MAX_BUSINESS_ID };
-  try {
-    const source = opts.source ?? createDefaultManagedSourceAdapter();
-    const biz = await source.getBusiness(configuredBusinessId());
-    const subs = await source.listSubscriptions(configuredBusinessId());
-    out.max = {
+  const out: Record<string, unknown> = {
+    send_mode: cfg.SEND_MODE,
+    daily_review_target: cfg.GTM_DAILY_SEQUENCES,
+    active_path: 'Drive Market Map → Codex → local review → explicit HeyReach import',
+    market_map: {
       ok: true,
-      business: `${biz.name} (${biz.website})`,
-      icp: biz.ideal_customer_profile ? 'configured' : 'missing',
-      subscriptions: subs.length,
-      active_subscriptions: subs.filter((s) => s.active).length,
+      candidates: one<{ n: number }>('SELECT COUNT(*) n FROM candidates')?.n ?? 0,
+      outbound_fit: one<{ n: number }>(
+        `SELECT COUNT(*) n FROM boundary_qualifications b
+          WHERE b.boundary_status='PASS_OUTBOUND_V1'
+            AND b.id=(SELECT MAX(b2.id) FROM boundary_qualifications b2 WHERE b2.project_id=b.project_id)`,
+      )?.n ?? 0,
+      signals: one<{ n: number }>('SELECT COUNT(*) n FROM signal_events')?.n ?? 0,
+      review_ready: one<{ n: number }>(`SELECT COUNT(*) n FROM candidate_sequences WHERE status='final' AND review_status='pending'`)?.n ?? 0,
+    },
+  };
+  try {
+    const inspection = await createDefaultHeyReachAdapter(auditSink).inspectConfiguredCampaign();
+    out.heyreach = {
+      ok: true,
+      campaign_id: inspection.campaign.id,
+      status: inspection.campaign.status,
+      leads: inspection.leadCount,
+      inert: inspection.inert,
     };
   } catch (e) {
-    out.max = { ok: false, error: (e as Error).message };
+    out.heyreach = { ok: false, error: (e as Error).message };
   }
-  try {
-    const account = await (opts.execution ?? createDefaultExecutionAdapter(auditSink)).getAccount();
-    out.overloop = {
-      ok: true,
-      user: `${account.user.name} <${account.user.email}>`,
-      sending_addresses: account.sendingIdentities.length,
-      working_senders: account.sendingIdentities.filter((identity) => identity.working).length,
-    };
-  } catch (e) {
-    out.overloop = { ok: false, error: (e as Error).message };
+  if (cfg.MAX_API_KEY && cfg.MAX_BUSINESS_ID) {
+    try {
+      const source = opts.source ?? createDefaultManagedSourceAdapter();
+      const biz = await source.getBusiness(configuredBusinessId());
+      out.legacy_max = { configured: true, ok: true, business: biz.name };
+    } catch (e) {
+      out.legacy_max = { configured: true, ok: false, error: (e as Error).message };
+    }
+  } else out.legacy_max = { configured: false, required: false };
+  if (cfg.OVERLOOP_API_KEY) {
+    try {
+      const account = await (opts.execution ?? createDefaultExecutionAdapter(auditSink)).getAccount();
+      out.legacy_overloop = { configured: true, ok: true, user: account.user.name };
+    } catch (e) {
+      out.legacy_overloop = { configured: true, ok: false, error: (e as Error).message };
+    }
+  } else {
+    out.legacy_overloop = { configured: false, required: false };
   }
-  out.seller_profile = getSellerProfile() ? 'set' : 'missing — run `gtm init`';
+  out.seller_profile = getSellerProfile() ? 'set' : 'missing';
   return out;
 }
 

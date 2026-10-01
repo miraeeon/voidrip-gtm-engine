@@ -74,6 +74,41 @@ export const BoundaryQualificationInput = z.object({
 });
 export type BoundaryQualificationInput = z.infer<typeof BoundaryQualificationInput>;
 
+export const SignalEventInput = z.object({
+  candidate_id: z.number().int().positive(),
+  project_id: z.number().int().positive(),
+  source_signal_id: z.string().trim().min(1),
+  signal_type: z.string().trim().min(1),
+  source: z.string().trim().min(1),
+  event_date: z.string().trim().min(1).nullable().optional(),
+  evidence: z.string().trim().min(1).max(4000),
+  strength: z.number().int().min(1).max(5).nullable().optional(),
+  mentionability: z.enum(['YES', 'NO', 'UNKNOWN']),
+});
+export type SignalEventInput = z.infer<typeof SignalEventInput>;
+
+const SnapshotProject = ProjectResolutionInput.omit({ candidate_id: true }).extend({
+  external_project_id: z.string().trim().min(1),
+});
+const SnapshotQualification = BoundaryQualificationInput.omit({ candidate_id: true, project_id: true }).extend({
+  external_qualification_id: z.string().trim().min(1),
+});
+const SnapshotSignal = SignalEventInput.omit({ candidate_id: true, project_id: true, source_signal_id: true }).extend({
+  external_signal_id: z.string().trim().min(1),
+});
+
+export const MarketMapSnapshotRecord = z.object({
+  external_candidate_id: z.string().trim().min(1),
+  source: z.string().trim().min(1),
+  source_lane_id: z.string().trim().min(1),
+  source_observation_id: z.string().trim().min(1),
+  candidate: CandidateImportRecord.omit({ source_record_id: true }),
+  project: SnapshotProject,
+  qualification: SnapshotQualification,
+  signals: z.array(SnapshotSignal).default([]),
+});
+export type MarketMapSnapshotRecord = z.infer<typeof MarketMapSnapshotRecord>;
+
 export const ActivationScoreInput = z.object({
   candidate_id: z.number().int().positive(),
   project_id: z.number().int().positive(),

@@ -6,7 +6,9 @@ import {
   BoundaryQualificationInput,
   CandidateImportRecord,
   CandidateSequenceInput,
+  MarketMapSnapshotRecord,
   ProjectResolutionInput,
+  SignalEventInput,
 } from './contracts.js';
 import {
   getBoundaryQueue,
@@ -17,10 +19,20 @@ import {
   saveProjectResolution,
 } from './qualification.js';
 import { getMarketDraftingQueue, getMarketReviewQueue, saveCandidateSequence } from './drafting.js';
+import { getSignalQueue, saveSignalEvents } from './signals.js';
+import { syncMarketMapSnapshot } from './snapshot.js';
+import { getDailyBuffer } from './daily-buffer.js';
 
 const def = <S extends z.ZodRawShape>(tool: ToolDef<S>) => tool as unknown as ToolDef;
 
 export const MARKET_MAP_TOOLS: ToolDef[] = [
+  def({
+    name: 'gtm_sync_market_map_snapshot',
+    title: 'Synchronize the governed Market Map snapshot',
+    description: 'Idempotently imports already-governed Person + Project, Boundary and signal records from the Drive Market Map. No activation or provider action occurs.',
+    input: { records: z.array(MarketMapSnapshotRecord).min(1).max(1000) },
+    handler: (args) => syncMarketMapSnapshot(args.records),
+  }),
   def({
     name: 'gtm_ingest_candidates',
     title: 'Ingest candidates into the persistent Market Map',
@@ -59,6 +71,21 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
     handler: (args) => saveBoundaryQualifications(args.items),
   }),
   def({
+    name: 'gtm_get_signal_queue',
+    title: 'Qualified prospects needing public signal refresh',
+    description: 'PASS_OUTBOUND_V1 Person + Project records that need current public evidence before activation.',
+    input: { limit: z.number().int().min(1).max(100).default(20) },
+    readOnly: true,
+    handler: (args) => getSignalQueue(args.limit),
+  }),
+  def({
+    name: 'gtm_save_signal_events',
+    title: 'Save public intent signals separately from fit',
+    description: 'Upsert dated, evidenced public signals. FIT is unchanged and signal mentionability remains explicit.',
+    input: { items: z.array(SignalEventInput).min(1).max(100) },
+    handler: (args) => saveSignalEvents(args.items),
+  }),
+  def({
     name: 'gtm_get_priority_queue',
     title: 'Qualified prospects needing activation priority',
     description: 'Only PASS_OUTBOUND_V1 records. FIT is fixed; use signals and timing to decide priority, intent and route.',
@@ -95,5 +122,13 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
     input: { limit: z.number().int().min(1).max(100).default(25) },
     readOnly: true,
     handler: (args) => getMarketReviewQueue(args.limit),
+  }),
+  def({
+    name: 'gtm_get_daily_buffer',
+    title: 'Daily human-review buffer',
+    description: 'Shows progress toward 20 evidence-backed prospects ready for human validation. Never lowers the quality floor and performs no provider action.',
+    input: { limit: z.number().int().min(1).max(100).optional() },
+    readOnly: true,
+    handler: (args) => getDailyBuffer(args.limit),
   }),
 ];

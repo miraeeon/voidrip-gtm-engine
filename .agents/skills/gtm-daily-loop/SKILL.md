@@ -1,59 +1,88 @@
 ---
 name: gtm-daily-loop
-description: Run the full VOIDRIP GTM daily loop end to end — learn from results, source candidates, classify and route each candidate, write and finalize sequences, push inert drafts through the configured execution adapter, verify safety and write the daily brief. Use when the user says "run the daily loop", "run today's GTM", "gtm daily", or on the scheduled daily run.
+description: Run the VOIDRIP daily Market Map loop toward a 20-prospect human-review buffer. Use for today's GTM, buffer preparation, signal refresh, or the scheduled daily run.
 ---
 
-# VOIDRIP GTM Engine — daily loop
+# VOIDRIP GTM — daily loop V1
 
-Codex is the qualification and orchestration engine. The configured source adapter supplies candidates and the execution adapter manages outbound drafts and results. Use the `gtm_*` MCP tools (or `node bin/gtm.mjs tool <name> '<json>'` if MCP is unavailable).
+Codex orchestrates a persistent Market Map. Drive remains the governed operational map; SQLite provides deterministic deduplication, qualification state, signals, activation, drafting and safety.
 
-**Safety first:** run `gtm_doctor` and read `send_mode`. In `locked` mode (the default) campaigns are inert drafts and enrollment is blocked in code. Never try to enroll, activate a campaign, or work around the SafetyGuard. Never message anyone yourself.
+## Non-negotiable safety
+
+- `SEND_MODE` stays `locked`.
+- The unattended loop may not approve, import leads into HeyReach, start, resume, or launch a campaign.
+- Adding leads to HeyReach requires a first explicit authorization from Jen.
+- Starting the campaign requires a second, distinct explicit authorization from Jen.
+- The target is 20 prospects ready for human review, never 20 contacts obtained by weakening the Boundary or intent evidence.
+
+## Daily target
+
+`gtm_get_daily_buffer` is the source of truth:
+
+- target: 20;
+- quality floor: `PASS_OUTBOUND_V1` + named visible Person + Project + current/recent public signal + Tier A/B + clean LinkedIn sequence;
+- if fewer than 20 satisfy the floor, report the exact deficit and continue sourcing or signal research. Do not promote Tier C or `PASS_MARKET_ONLY`.
 
 ## Steps
 
 ### 0. Preflight
-- `gtm_doctor` must show `max.ok` and `overloop.ok`. If a platform is down, stop and report it.
-- If `seller_profile` is missing, run `gtm_init` and then fill `gtm_seller_profile` (value_proposition, proof_points, primary_cta) from the business description. Ask the user when facts are unknown; never invent proof points.
 
-### 1. Learn from yesterday (feed intelligence back)
-Follow the **gtm-learn** skill:
-`gtm_sync_results` → `gtm_get_performance` → `gtm_save_learnings`.
-Skip this step when there are no outcomes at all.
+- Run `gtm_doctor`, `gtm_status`, `gtm_verify_heyreach`, then `gtm_get_daily_buffer`.
+- HeyReach must remain the configured campaign, `DRAFT`, with no outreach in progress.
+- A provider outage does not authorize a fallback provider or a new campaign.
 
-### 1b. Replies (the most valuable minutes of the day)
-Follow the **gtm-replies** skill:
-- `gtm_get_reply_queue`;
-- fetch any missing text (mailbox MCP or the user);
-- `gtm_save_reply_triage` for each reply.
+### 1. Sync results and replies
 
-Hot replies and their drafted answers go at the top of your summary.
+- Only after a campaign has previously run: sync HeyReach results and replies.
+- Replies always take priority over new sourcing.
+- Never send a reply automatically.
 
-### 2. Source
-- `gtm_source_leads`.
-- If there are 0 new leads, check `gtm_setup`: are any subscriptions active? Suggest (don't silently create) signal subscriptions that fit the ICP, then continue with any leads already queued.
+### 2. Refresh the persistent Market Map
 
-### 3. Classify and route
-Follow the **gtm-classify-route** skill. Loop `gtm_get_classification_queue` → `gtm_save_classifications` in batches of about 20 until `remaining_in_queue` is 0.
+- Read the governed Drive Market Map and its SourceLane evidence.
+- Normalize each changed Person + Project into `gtm_sync_market_map_snapshot`.
+- Preserve external candidate, project, observation and qualification IDs.
+- Do not replace the map with a fresh daily list.
 
-### 4. Write sequences
-Follow the **gtm-write-sequence** skill. Loop `gtm_get_drafting_queue` → for each lead: draft, self-critique, save as `final` with `gtm_save_sequence`. Fix any lint errors.
-- For more than 10 leads, dispatch batches to the `sequence-writer` subagent in parallel (5–8 leads each) when your environment supports subagents.
+### 3. Resolve and qualify new records
 
-### 5. Push
-- `gtm_push_to_overloop`, then `gtm_verify_overloop`.
-- In locked mode, `all_inert` must be `true`. If it is false, stop immediately and tell the user.
+- Use `gtm_get_resolution_queue` and save the real Person + Project.
+- Use `gtm_get_boundary_queue` and apply `GTM_BOUNDARY_V1` conservatively.
+- FIT and INTENT remain separate.
+- Missing evidence becomes `HOLD_EVIDENCE`, not an invented PASS or automatic FAIL.
 
-### 5b. Review gate (never skip)
-- New campaigns wait for a human. Point the user to `gtm_review_queue` / `gtm review`.
-- Call `gtm_approve` **only** when the user explicitly approves specific campaigns in this session.
-- Call `gtm_launch` (confirm "SEND") **only** when the user explicitly asks to send and `SEND_MODE=live`.
-- Never approve or launch on a scheduled or unattended run.
+### 4. Refresh public signals
 
-### 6. Report
-- `gtm_write_report`.
-- Then reply to the user with a short summary: leads in / routed / written / pushed, the top 3 sequences (name, tier, route, first line), what the loop learned, and anything that needs a human (replies to handle, missing seller facts, suggested Max signals).
+- Use `gtm_get_signal_queue`.
+- Research only observable, attributable, dated public events relevant to the named project.
+- Save them with `gtm_save_signal_events`, including strength and whether the signal may be mentioned.
+- Fit alone is Tier C and is not contact-ready.
+
+### 5. Prioritize
+
+- Use `gtm_get_priority_queue` and `gtm_save_activation_scores`.
+- Tier A requires intent 4–5 and current/recent evidence.
+- Tier B requires intent 2–3 and current/recent evidence.
+- Tier C remains in the Market Map with route `none`.
+- Outbound V1 route is LinkedIn.
+
+### 6. Draft
+
+- Use `gtm_get_market_drafting_queue` and the approved Activation Playbook.
+- Save with `gtm_save_candidate_sequence` only after lint is clean.
+- Copy remains grounded in the prospect's public evidence and official M1–M5 sequence.
+
+### 7. Fill the human-review buffer
+
+- Run `gtm_get_daily_buffer` again.
+- Export at most 20 ready records to the Google review sheet.
+- The sheet is the human approval surface; engine status is not approval.
+- Stop at review. Perform no HeyReach write.
+
+### 8. Report
+
+Report the ready count / 20, the exact deficit, the blocking stage, new qualifications, signals, clean drafts, HOLD reasons, and HeyReach read-only state. Confirm that no lead was imported and no campaign was started.
 
 ## Quality bar
-- Every first touch uses the lead's signal as the hook and would make no sense sent to anyone else.
-- Never state facts that are not in the lead data or the seller profile.
-- A smaller number of excellent sequences beats a larger number of mediocre ones. Use DQ freely.
+
+Every row must name the actual project, show why this person has strategic authority, cite current/recent public evidence, and support a message that would make no sense sent to someone else. If the system cannot reach 20 at that standard, the correct output is a measured deficit followed by more source or signal work.

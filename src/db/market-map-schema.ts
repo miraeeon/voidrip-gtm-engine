@@ -1,6 +1,7 @@
 export const MARKET_MAP_SCHEMA = `
 CREATE TABLE IF NOT EXISTS candidates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_id TEXT,
   name TEXT NOT NULL,
   linkedin_url TEXT,
   email TEXT,
@@ -34,6 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_observations_candidate ON source_observations(can
 
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_id TEXT,
   candidate_id INTEGER NOT NULL REFERENCES candidates(id),
   name TEXT,
   url TEXT,
@@ -51,6 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_candidate ON projects(candidate_id);
 
 CREATE TABLE IF NOT EXISTS boundary_qualifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_qualification_id TEXT,
   candidate_id INTEGER NOT NULL REFERENCES candidates(id),
   project_id INTEGER NOT NULL REFERENCES projects(id),
   boundary_version TEXT NOT NULL,
@@ -73,6 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_boundary_candidate ON boundary_qualifications(can
 
 CREATE TABLE IF NOT EXISTS signal_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_signal_id TEXT,
   candidate_id INTEGER NOT NULL REFERENCES candidates(id),
   project_id INTEGER NOT NULL REFERENCES projects(id),
   signal_type TEXT NOT NULL,

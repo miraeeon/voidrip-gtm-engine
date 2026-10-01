@@ -11,6 +11,9 @@ import {
   saveProjectResolution,
 } from '../src/market-map/qualification.js';
 import { getMarketDraftingQueue, getMarketReviewQueue, saveCandidateSequence } from '../src/market-map/drafting.js';
+import { saveSignalEvents } from '../src/market-map/signals.js';
+import { syncMarketMapSnapshot } from '../src/market-map/snapshot.js';
+import { getDailyBuffer } from '../src/market-map/daily-buffer.js';
 import { freshEnv } from './helpers.js';
 
 const record = (sourceRecordId: string) => ({
@@ -80,16 +83,28 @@ describe('Market Map local E2E', () => {
     }]);
     expect(getPriorityQueue()).toHaveLength(1);
 
+    saveSignalEvents([{
+      candidate_id: candidate.id,
+      project_id: resolution.project_id,
+      source_signal_id: 'signal-world-one-1',
+      signal_type: 'PROJECT_UPDATE',
+      source: 'public-project-site',
+      event_date: '2026-09-30',
+      evidence: 'World One published a new cross-format project update.',
+      strength: 3,
+      mentionability: 'YES',
+    }]);
+
     saveActivationScores([{
       candidate_id: candidate.id,
       project_id: resolution.project_id,
-      intent_strength: null,
-      freshness: 'UNKNOWN',
+      intent_strength: 3,
+      freshness: 'RECENT',
       priority_tier: 'B',
       route: 'linkedin',
       angle: 'complex world coherence',
       channel_plan: null,
-      reasoning: 'Strong fit; no current intent signal, so keep priority conservative.',
+      reasoning: 'Strong fit plus a recent public project signal.',
     }]);
     expect(getMarketDraftingQueue().candidates).toHaveLength(1);
 
@@ -150,5 +165,71 @@ describe('Market Map local E2E', () => {
       reasoning: 'Should not pass outbound.',
     }])).toThrow(/cannot be PASS_OUTBOUND_V1/);
     expect(all('SELECT * FROM boundary_qualifications')).toHaveLength(0);
+  });
+
+  it('synchronizes a governed Market Map snapshot idempotently without provider action', () => {
+    const snapshot = [{
+      external_candidate_id: 'C-ARI',
+      source: 'drive-market-map',
+      source_lane_id: 'M-B',
+      source_observation_id: 'SO-ARI-1',
+      candidate: record('ignored'),
+      project: {
+        external_project_id: 'P-WORLD',
+        name: 'World One',
+        url: 'https://world.example/one',
+        description: 'A persistent narrative world across film and interactive media.',
+        kernel_primary: 'MEDIA' as const,
+        kernel_secondary: null,
+        project_visibility: 'VISIBLE' as const,
+        project_alignment: 'SELF_OWNED_PROFESSIONAL_PROJECT' as const,
+        status: 'ACTIVE',
+        evidence: ['Project is visible from the professional identity.'],
+      },
+      qualification: {
+        external_qualification_id: 'BQ-ARI-1',
+        boundary_version: 'GTM_BOUNDARY_V1' as const,
+        boundary_status: 'PASS_OUTBOUND_V1' as const,
+        kernel_primary: 'MEDIA' as const,
+        kernel_secondary: null,
+        project_real: 'YES' as const,
+        strategic_authority: 'INDIVIDUAL' as const,
+        ambition: 'HIGH' as const,
+        intrinsic_complexity: 'HIGH' as const,
+        professional_project_visibility: 'ALIGNED' as const,
+        failed_gates: [],
+        missing_evidence: [],
+        evidence_summary: 'Named project, visible body of work and direct strategic authority.',
+        confidence: 'HIGH' as const,
+        reasoning: 'Every outbound Boundary gate is supported.',
+      },
+      signals: [],
+    }];
+    expect(syncMarketMapSnapshot(snapshot).qualifications_inserted).toBe(1);
+    expect(syncMarketMapSnapshot(snapshot).qualifications_inserted).toBe(0);
+    expect(one<{ n: number }>('SELECT COUNT(*) n FROM candidates')!.n).toBe(1);
+    expect(one<{ n: number }>('SELECT COUNT(*) n FROM projects')!.n).toBe(1);
+    expect(one<{ n: number }>('SELECT COUNT(*) n FROM boundary_qualifications')!.n).toBe(1);
+    expect(one<{ n: number }>('SELECT COUNT(*) n FROM source_observations')!.n).toBe(1);
+    expect(getDailyBuffer(20)).toMatchObject({ target: 20, ready: 0, deficit: 20, complete: false, provider_action: 'NONE' });
+  });
+
+  it('refuses Tier A/B activation without a dated public signal', () => {
+    const imported = ingestCandidates({ source: 'manual', source_lane_id: 'V-A', records: [record('guard-1')] });
+    const project = saveProjectResolution({
+      candidate_id: imported.candidate_ids[0]!, name: 'World One', url: 'https://world.example/one',
+      description: 'Persistent cross-format world.', kernel_primary: 'MEDIA', kernel_secondary: null,
+      project_visibility: 'VISIBLE', project_alignment: 'SELF_OWNED_PROFESSIONAL_PROJECT', status: 'ACTIVE', evidence: ['Visible project.'],
+    });
+    saveBoundaryQualifications([{
+      candidate_id: imported.candidate_ids[0]!, project_id: project.project_id, boundary_version: 'GTM_BOUNDARY_V1',
+      boundary_status: 'PASS_OUTBOUND_V1', kernel_primary: 'MEDIA', kernel_secondary: null, project_real: 'YES',
+      strategic_authority: 'INDIVIDUAL', ambition: 'HIGH', intrinsic_complexity: 'HIGH', professional_project_visibility: 'ALIGNED',
+      failed_gates: [], missing_evidence: [], evidence_summary: 'All gates evidenced.', confidence: 'HIGH', reasoning: 'All gates evidenced.',
+    }]);
+    expect(() => saveActivationScores([{
+      candidate_id: imported.candidate_ids[0]!, project_id: project.project_id, intent_strength: 5, freshness: 'CURRENT',
+      priority_tier: 'A', route: 'linkedin', angle: 'world coherence', channel_plan: null, reasoning: 'Would otherwise qualify.',
+    }])).toThrow(/requires at least one evidenced public signal/);
   });
 });

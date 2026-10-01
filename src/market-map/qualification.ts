@@ -142,7 +142,16 @@ export function getPriorityQueue(limit = 25) {
        JOIN boundary_qualifications b ON b.project_id = p.id
       WHERE c.state = 'PASS_OUTBOUND_V1'
         AND b.id = (SELECT MAX(b2.id) FROM boundary_qualifications b2 WHERE b2.project_id = p.id)
-        AND NOT EXISTS (SELECT 1 FROM activation_scores a WHERE a.boundary_qualification_id = b.id)
+        AND (
+          NOT EXISTS (SELECT 1 FROM activation_scores a WHERE a.boundary_qualification_id = b.id)
+          OR EXISTS (
+            SELECT 1 FROM signal_events s
+             WHERE s.candidate_id = c.id AND s.project_id = p.id
+               AND s.created_at > COALESCE((
+                 SELECT MAX(a2.created_at) FROM activation_scores a2 WHERE a2.boundary_qualification_id = b.id
+               ), '')
+          )
+        )
       ORDER BY b.id ASC LIMIT ?`,
     limit,
   ).map((item) => ({
@@ -162,6 +171,23 @@ export function saveActivationScores(items: unknown[]) {
         input.project_id,
       );
       if (!boundary || boundary.boundary_status !== 'PASS_OUTBOUND_V1') throw new Error('activation scoring requires PASS_OUTBOUND_V1');
+      const signalCount = one<{ n: number }>(
+        'SELECT COUNT(*) n FROM signal_events WHERE candidate_id = ? AND project_id = ?',
+        input.candidate_id,
+        input.project_id,
+      )?.n ?? 0;
+      if (['A', 'B'].includes(input.priority_tier)) {
+        if (signalCount === 0) throw new Error('Tier A/B activation requires at least one evidenced public signal');
+        if (!['CURRENT', 'RECENT'].includes(input.freshness)) throw new Error('Tier A/B activation requires current or recent evidence');
+        if (input.priority_tier === 'A' && (input.intent_strength ?? 0) < 4) throw new Error('Tier A requires intent strength 4-5');
+        if (input.priority_tier === 'B' && ((input.intent_strength ?? 0) < 2 || (input.intent_strength ?? 0) > 3)) {
+          throw new Error('Tier B requires intent strength 2-3');
+        }
+        if (input.route !== 'linkedin') throw new Error('Outbound V1 Tier A/B route is LinkedIn');
+      }
+      if (['C', 'DQ'].includes(input.priority_tier) && input.route !== 'none') {
+        throw new Error('Tier C/DQ stays in the Market Map and must use route none');
+      }
       const candidate = one<any>('SELECT * FROM candidates WHERE id = ?', input.candidate_id);
       const routed = applyRoutingRules(candidate, input.route, input.priority_tier);
       const result = run(
