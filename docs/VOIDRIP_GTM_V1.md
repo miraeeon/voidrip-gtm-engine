@@ -21,6 +21,27 @@ Market Intelligence
 
 Le Market Map est persistant. `Person + Project` est l’unité de qualification. FIT et INTENT restent séparés. Seuls les `PASS_OUTBOUND_V1` avec signal public actuel ou récent peuvent entrer dans le buffer de 20 cas.
 
+La collecte quotidienne ne commence pas par une recherche libre de personnes ni par le
+pool des founders déjà connus. Codex lit le moteur d’Acquisition Intelligence gouverné
+dans Drive :
+
+`Need Territories → Retrieval Routes → BOFU Query Families → BOFU DAILY QUEUE`.
+
+Le premier quota de 20 porte sur des `BOFU_CANDIDATE` high-recall : signal HOT/WARM,
+comportement actif de résolution, projet ou project hint, Kernel plausible et identité
+publique résolvable. Ces candidats entrent ensuite dans le Market Map par
+`gtm_ingest_candidates`, avec la Query Family comme `source_lane_id`. Ils ne deviennent
+jamais automatiquement des prospects activables. La résolution Person + Project, la
+Boundary, le besoin structurel actuel, la priorité et la rédaction restent des gates
+séparés.
+
+Un MVP livré prouve qu’une première structure existe déjà ; sa sortie, son lancement ou
+sa demande de feedback n’est donc jamais un signal que la personne a besoin de VOIDRIP
+pour structurer le projet. Un cas ne peut revenir dans l’activation que sur la preuve
+distincte d’un besoin actuel de restructuration du projet entier. La participation
+actuelle à Y Combinator bloque l’activation ; l’appartenance à tout autre programme ne
+constitue jamais à elle seule un signal d’intention.
+
 HeyReach est l’exécuteur LinkedIn V1. Max et Overloop restent des adapters hérités optionnels ; ils ne font pas partie du chemin actif.
 
 ## Sécurité par défaut
@@ -52,13 +73,16 @@ La skill `.agents/skills/gtm-daily-loop/SKILL.md` exécute :
 
 1. preflight et readiness ;
 2. lecture des résultats et réponses déjà lancés ;
-3. rafraîchissement du Market Map et des signaux ;
-4. Boundary Qualification ;
-5. scoring d’activation ;
-6. rédaction et lint des séquences ;
-7. constitution du buffer de 20 cas ;
-8. brief quotidien ;
-9. éventuelle proposition de learning fondée uniquement sur des résultats réels.
+3. reprise du Kernel en cours dans `BOFU DAILY QUEUE`, puis collecte via les Query
+   Families jusqu’au quota ou au cap mesuré ;
+4. ingestion dédupliquée dans le Market Map et rafraîchissement des sources existantes ;
+5. résolution Person + Project et Boundary Qualification ;
+6. rafraîchissement séparé des signaux ;
+7. scoring d’activation ;
+8. rédaction et lint des séquences ;
+9. constitution du buffer de 20 cas réellement activables ;
+10. brief quotidien avec les deux déficits, BOFU_CANDIDATE et activation ;
+11. éventuelle proposition de learning fondée uniquement sur des résultats réels.
 
 Elle s’arrête à la revue humaine. Elle n’importe pas et ne lance pas.
 

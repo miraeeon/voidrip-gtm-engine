@@ -17,7 +17,16 @@ Codex orchestrates a persistent Market Map. Drive remains the governed operation
 
 ## Daily target
 
-`gtm_get_daily_buffer` is the source of truth:
+The loop has two different counters and must never collapse them:
+
+- Phase G intake target: 20 new unique `BOFU_CANDIDATE` for the Kernel of the day;
+- activation target: 20 prospects in `gtm_get_daily_buffer` that passed every downstream gate.
+
+`BOFU_CANDIDATE` is high-recall input, not an outbound-ready prospect. Continue the
+governed collection and qualification loop until the review buffer reaches its target;
+do not pretend that 20 raw BOFU candidates equal 20 activations.
+
+`gtm_get_daily_buffer` remains the source of truth for activation:
 
 - target: 20;
 - quality floor: `PASS_OUTBOUND_V1` + named visible Person + Project + current/recent public signal + Tier A/B + clean LinkedIn sequence;
@@ -38,28 +47,55 @@ Codex orchestrates a persistent Market Map. Drive remains the governed operation
 - Replies always take priority over new sourcing.
 - Never send a reply automatically.
 
-### 2. Refresh the persistent Market Map
+### 2. Collect from the governed Acquisition Intelligence engine
+
+- Read `01 — VOIDRIP — ACQUISITION SIGNAL REGISTRY V2`, especially
+  `BOFU DAILY CONFIG`, `BOFU QUERY FAMILIES`, `BOFU DAILY QUEUE`, and
+  `BOFU DAILY METRICS`.
+- Resume an unfinished Kernel run before choosing a new Kernel. Do not invent a rotation
+  state that is not recorded.
+- Execute several small Query Families derived from Need Territories and Retrieval
+  Routes. Need Territories guide the search; they are not inferred as facts about a
+  person.
+- Keep a result as a `BOFU_CANDIDATE` only when it has a HOT/WARM public signal,
+  active resolution behavior, a real project or credible project hint, a plausible
+  Kernel, and a resolvable public person identity.
+- A launch, MVP, product update, accelerator page, YC page, or request for product
+  feedback alone never passes this gate. A shipped MVP is evidence that a first
+  structure already exists; it is not evidence that the person needs VOIDRIP to create
+  that structure. Only a distinct, explicit current restructuring need may be evaluated
+  on its own evidence.
+- Current Y Combinator participation is a hard activation exclusion. Other program
+  participation is an attractor only and never establishes outbound intent by itself.
+- Ingest kept records with `gtm_ingest_candidates`, grouped by
+  `BOFU QUERY FAMILY` as the `source_lane_id`. Preserve queue id, public source URL,
+  source date, Need Territory ids, intent evidence, recency, and the raw governed row.
+- Deduplicate on Person + Project and record the measured deficit. Use free/public
+  surfaces first; a paid collector may only close the measured gap under its governed
+  cost gate.
+
+### 3. Refresh the persistent Market Map
 
 - Read the governed Drive Market Map and its SourceLane evidence.
 - Normalize each changed Person + Project into `gtm_sync_market_map_snapshot`.
 - Preserve external candidate, project, observation and qualification IDs.
 - Do not replace the map with a fresh daily list.
 
-### 3. Resolve and qualify new records
+### 4. Resolve and qualify new records
 
 - Use `gtm_get_resolution_queue` and save the real Person + Project.
 - Use `gtm_get_boundary_queue` and apply `GTM_BOUNDARY_V1` conservatively.
 - FIT and INTENT remain separate.
 - Missing evidence becomes `HOLD_EVIDENCE`, not an invented PASS or automatic FAIL.
 
-### 4. Refresh public signals
+### 5. Refresh public signals
 
 - Use `gtm_get_signal_queue`.
 - Research only observable, attributable, dated public events relevant to the named project.
 - Save them with `gtm_save_signal_events`, including strength and whether the signal may be mentioned.
 - Fit alone is Tier C and is not contact-ready.
 
-### 5. Prioritize
+### 6. Prioritize
 
 - Use `gtm_get_priority_queue` and `gtm_save_activation_scores`.
 - Tier A requires intent 4–5 and current/recent evidence.
@@ -67,29 +103,32 @@ Codex orchestrates a persistent Market Map. Drive remains the governed operation
 - Tier C remains in the Market Map with route `none`.
 - Outbound V1 route is LinkedIn.
 
-### 6. Draft
+### 7. Draft
 
 - Use `gtm_get_market_drafting_queue` and the approved Activation Playbook.
 - Save with `gtm_save_candidate_sequence` only after lint is clean.
 - Copy remains grounded in the prospect's public evidence and official M1–M5 sequence.
 
-### 7. Fill the human-review buffer
+### 8. Fill the human-review buffer
 
 - Run `gtm_get_daily_buffer` again.
 - Export at most 20 ready records to the Google review sheet.
 - The sheet is the human approval surface; engine status is not approval.
 - Stop at review. Perform no HeyReach write.
 
-### 8. Learning readiness
+### 9. Learning readiness
 
 - Read `gtm_get_market_performance` only from real outcomes.
 - A learning iteration creates `gtm_save_market_learning_proposal`; it never applies itself.
 - `gtm_review_market_learning` is a separate human-only action and is not available unattended.
 - Never change the Boundary automatically.
 
-### 9. Report
+### 10. Report
 
-Report the ready count / 20, the exact deficit, the blocking stage, new qualifications, signals, clean drafts, HOLD reasons, and HeyReach read-only state. Confirm that no lead was imported and no campaign was started.
+Report both counters: new unique BOFU candidates for the active Kernel and ready
+prospects / 20. Include the exact deficit, the blocking stage, new qualifications,
+signals, clean drafts, HOLD reasons, and HeyReach read-only state. Confirm that no lead
+was imported and no campaign was started.
 
 Do not install the OS schedule until Jen explicitly decides to enable the finished system.
 
