@@ -22,10 +22,17 @@ Market Intelligence
 Le Market Map est persistant. `Person + Project` est l’unité de qualification. FIT et INTENT restent séparés. Seuls les `PASS_OUTBOUND_V1` avec signal public actuel ou récent peuvent entrer dans le buffer de 20 cas.
 
 La collecte quotidienne ne commence pas par une recherche libre de personnes ni par le
-pool des founders déjà connus. Codex lit le moteur d’Acquisition Intelligence gouverné
-dans Drive :
+pool des founders déjà connus. Codex charge le contrat exécutable
+`gtm_get_source_lane_collection_plan`, dérivé du moteur d’Acquisition Intelligence
+gouverné dans Drive :
 
-`Need Territories → Retrieval Routes → BOFU Query Families → BOFU DAILY QUEUE`.
+`Need Territories → Derived Prospecting Persona / attracteurs → SourceLanes V-A, H-A2,
+R-A2, M-B → connecteur disponible → Market Map`.
+
+Apollo, Clay et SocialCrawl peuvent devenir des connecteurs d’expansion, mais aucun
+d’eux n’est la définition du profil ni une dépendance obligatoire. Quand une lane ne
+peut pas être exécutée, le système rapporte ce déficit ; il ne le masque jamais par une
+recherche manuelle libre de personnes.
 
 Le premier quota de 20 porte sur des `BOFU_CANDIDATE` high-recall : signal HOT/WARM,
 comportement actif de résolution, projet ou project hint, Kernel plausible et identité
@@ -73,11 +80,13 @@ La skill `.agents/skills/gtm-daily-loop/SKILL.md` exécute :
 
 1. preflight et readiness ;
 2. lecture des résultats et réponses déjà lancés ;
-3. reprise du Kernel en cours dans `BOFU DAILY QUEUE`, puis collecte via les Query
-   Families jusqu’au quota ou au cap mesuré ;
+3. reprise du Kernel en cours, appel de `gtm_get_source_lane_collection_plan`, puis
+   exécution des seuls work packets gouvernés via le connecteur disponible jusqu’au
+   quota ou au cap mesuré ;
 4. ingestion dédupliquée dans le Market Map et rafraîchissement des sources existantes ;
 5. résolution Person + Project et Boundary Qualification ;
-6. rafraîchissement séparé des signaux ;
+6. appel de `gtm_get_signal_collection_plan`, puis recherche de signaux uniquement sur
+   les Person + Project qualifiés ;
 7. scoring d’activation ;
 8. rédaction et lint des séquences ;
 9. constitution du buffer de 20 cas réellement activables ;
@@ -85,6 +94,10 @@ La skill `.agents/skills/gtm-daily-loop/SKILL.md` exécute :
 11. éventuelle proposition de learning fondée uniquement sur des résultats réels.
 
 Elle s’arrête à la revue humaine. Elle n’importe pas et ne lance pas.
+
+Les deux plans sont séparés : la première boucle augmente le stock FIT persistant ; la
+seconde ne découvre jamais de nouvelles personnes et ne cherche que l’INTENT des cas
+déjà qualifiés. Un participant YC en cours est retiré de la queue de signaux.
 
 ## Deux validations HeyReach
 
