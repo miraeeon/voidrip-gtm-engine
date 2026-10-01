@@ -1,4 +1,5 @@
 import { all, logRun, nowIso, one, run, tx } from '../db/db.js';
+import { outsideCurrentYcProgramSql } from './activation-eligibility.js';
 import { SignalEventInput } from './contracts.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -16,6 +17,7 @@ export function getSignalQueue(limit = 20) {
        )
       WHERE b.boundary_status = 'PASS_OUTBOUND_V1'
         AND c.state NOT IN ('ACTIVATION_READY','DRAFTED','REVIEW_READY')
+        AND ${outsideCurrentYcProgramSql('c.id', 'p.id')}
       ORDER BY CASE WHEN EXISTS (
         SELECT 1 FROM signal_events s WHERE s.candidate_id = c.id AND s.project_id = p.id
       ) THEN 1 ELSE 0 END, c.updated_at ASC

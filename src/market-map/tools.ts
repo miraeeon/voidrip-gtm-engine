@@ -20,12 +20,25 @@ import {
 } from './qualification.js';
 import { getMarketDraftingQueue, getMarketReviewQueue, saveCandidateSequence, saveCandidateSequences } from './drafting.js';
 import { getSignalQueue, saveSignalEvents } from './signals.js';
+import { getSignalCollectionPlan } from './signal-collection.js';
+import { getSourceLaneCollectionPlan } from './source-lanes.js';
 import { syncMarketMapSnapshot } from './snapshot.js';
 import { getDailyBuffer } from './daily-buffer.js';
 
 const def = <S extends z.ZodRawShape>(tool: ToolDef<S>) => tool as unknown as ToolDef;
 
 export const MARKET_MAP_TOOLS: ToolDef[] = [
+  def({
+    name: 'gtm_get_source_lane_collection_plan',
+    title: 'Governed SourceLane collection plan',
+    description: 'Returns the calibrated multi-source collection contract for V-A, H-A2, R-A2 or M-B. Codex executes it to feed FIT stock; Apollo, Clay and SocialCrawl remain optional. Free-form manual person discovery is not a fallback.',
+    input: {
+      kernel: z.enum(['VENTURE', 'HARDWARE', 'RESEARCH', 'MEDIA']).optional(),
+      target: z.number().int().min(1).max(500).default(20),
+    },
+    readOnly: true,
+    handler: (args) => getSourceLaneCollectionPlan({ kernel: args.kernel, target: args.target }),
+  }),
   def({
     name: 'gtm_sync_market_map_snapshot',
     title: 'Synchronize the governed Market Map snapshot',
@@ -77,6 +90,14 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
     input: { limit: z.number().int().min(1).max(100).default(20) },
     readOnly: true,
     handler: (args) => getSignalQueue(args.limit),
+  }),
+  def({
+    name: 'gtm_get_signal_collection_plan',
+    title: 'Bounded signal collection plan',
+    description: 'Builds candidate-specific public-signal searches only for already-qualified Person + Project records. It never discovers replacement people and never treats an MVP, launch, feedback request or current YC participation as activation proof.',
+    input: { limit: z.number().int().min(1).max(100).default(20) },
+    readOnly: true,
+    handler: (args) => getSignalCollectionPlan(args.limit),
   }),
   def({
     name: 'gtm_save_signal_events',

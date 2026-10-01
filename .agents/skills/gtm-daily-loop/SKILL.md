@@ -47,16 +47,19 @@ do not pretend that 20 raw BOFU candidates equal 20 activations.
 - Replies always take priority over new sourcing.
 - Never send a reply automatically.
 
-### 2. Collect from the governed Acquisition Intelligence engine
+### 2. Feed the FIT stock through governed SourceLanes
 
-- Read `01 — VOIDRIP — ACQUISITION SIGNAL REGISTRY V2`, especially
-  `BOFU DAILY CONFIG`, `BOFU QUERY FAMILIES`, `BOFU DAILY QUEUE`, and
-  `BOFU DAILY METRICS`.
+- Call `gtm_get_source_lane_collection_plan` for the active Kernel. This is the
+  executable bridge from Need Territories, Derived Prospecting Persona and
+  attractors to the persistent Market Map.
+- Execute only the returned V-A, H-A2, R-A2 or M-B work packets through the
+  available public or authenticated source connector. Apollo, Clay and
+  SocialCrawl are optional expanders, never hard dependencies and never the
+  definition of the target profile.
 - Resume an unfinished Kernel run before choosing a new Kernel. Do not invent a rotation
   state that is not recorded.
-- Execute several small Query Families derived from Need Territories and Retrieval
-  Routes. Need Territories guide the search; they are not inferred as facts about a
-  person.
+- Need Territories and Query Families guide retrieval; they are not inferred as facts
+  about a person.
 - Keep a result as a `BOFU_CANDIDATE` only when it has a HOT/WARM public signal,
   active resolution behavior, a real project or credible project hint, a plausible
   Kernel, and a resolvable public person identity.
@@ -73,6 +76,8 @@ do not pretend that 20 raw BOFU candidates equal 20 activations.
 - Deduplicate on Person + Project and record the measured deficit. Use free/public
   surfaces first; a paid collector may only close the measured gap under its governed
   cost gate.
+- Never compensate for a missing SourceLane connector by freely searching for people
+  one by one. Report the connector or coverage deficit instead.
 
 ### 3. Refresh the persistent Market Map
 
@@ -90,10 +95,14 @@ do not pretend that 20 raw BOFU candidates equal 20 activations.
 
 ### 5. Refresh public signals
 
-- Use `gtm_get_signal_queue`.
+- Use `gtm_get_signal_collection_plan`. Execute only the candidate-specific queries it
+  returns; the plan is built from `gtm_get_signal_queue` and therefore cannot become a
+  second person-discovery loop.
 - Research only observable, attributable, dated public events relevant to the named project.
 - Save them with `gtm_save_signal_events`, including strength and whether the signal may be mentioned.
 - Fit alone is Tier C and is not contact-ready.
+- If no qualifying signal is found, record the deficit for that Person + Project. Do not
+  replace it with an arbitrary newly discovered person.
 
 ### 6. Prioritize
 
