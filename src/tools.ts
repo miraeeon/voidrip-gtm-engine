@@ -10,6 +10,7 @@ import { enrichFromOverloop } from './pipeline/enrich.js';
 import { ClassificationInput, getClassificationQueue, saveClassifications } from './pipeline/classify.js';
 import { LearningInput, saveLearnings } from './pipeline/learn.js';
 import { getPlaybook } from './pipeline/playbook.js';
+import { verifyHeyReachCampaign } from './pipeline/heyreach.js';
 import { approvePushes, cleanupOverloop, launchApproved, pushToOverloop, reviewQueue, verifyPushes } from './pipeline/push.js';
 import { detectReplies, getReplyQueue, ingestReply, replyInbox, ReplyTriageInput, resolveReply, saveReplyTriage, simulateReplies } from './pipeline/replies.js';
 import { recordOutcome, simulateResults, syncResults } from './pipeline/results.js';
@@ -194,6 +195,15 @@ export const TOOLS: ToolDef[] = [
     input: { limit: z.number().int().min(1).max(100).default(25) },
     readOnly: true,
     handler: (a) => verifyPushes({ limit: a.limit }),
+  }),
+  def({
+    name: 'gtm_verify_heyreach',
+    title: 'Verify the configured HeyReach campaign',
+    description:
+      'Read-only: inspect the existing HeyReach campaign selected by HEYREACH_CAMPAIGN_ID. Reports identity, status, lead count and whether it remains an inert DRAFT. Never creates, edits, starts or resumes a campaign.',
+    input: {},
+    readOnly: true,
+    handler: () => verifyHeyReachCampaign(),
   }),
   def({
     name: 'gtm_sync_results',

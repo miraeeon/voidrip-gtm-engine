@@ -18,6 +18,7 @@ const UNATTENDED = process.env.GTM_UNATTENDED === '1';
 const INSTRUCTIONS = `VOIDRIP GTM Engine: SourceAdapter supplies candidates; ExecutionAdapter manages outbound drafts, activation and results. Max and Overloop are optional bundled adapters; Codex is the qualification and orchestration engine.
 Daily loop: gtm_sync_results -> gtm_get_performance -> gtm_save_learnings -> gtm_source_leads -> gtm_get_classification_queue -> gtm_save_classifications -> gtm_get_drafting_queue -> gtm_save_sequence (draft, critique, final) -> gtm_push_to_overloop -> gtm_verify_overloop -> gtm_write_report.
 Local E2E: gtm_ingest_candidates -> gtm_get_resolution_queue -> gtm_save_project_resolution -> gtm_get_boundary_queue -> gtm_save_boundary_qualifications -> gtm_get_priority_queue -> gtm_save_activation_scores -> gtm_get_market_drafting_queue -> gtm_save_candidate_sequence -> gtm_get_market_review_queue. Stop there: no provider push or send.
+HeyReach V1: gtm_verify_heyreach only inspects the existing configured campaign. It never creates, edits, enrolls, starts or resumes anything.
 Rules: the lead's buying signal is the hook of the first touch; every message must be specific to one person; never invent facts; no signatures (Overloop adds them).
 Safety: SEND_MODE=${safeMode()} — in locked mode campaigns are inert drafts and enrollment is blocked in code. Never try to work around the SafetyGuard.${UNATTENDED ? ' This is an unattended run: approval, launch, cleanup, simulations and source-control mutations are not exposed.' : ''}`;
 
