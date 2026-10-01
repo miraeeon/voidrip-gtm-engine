@@ -17,7 +17,6 @@ const dayList = z
   .string()
   .transform((s) => s.split(',').map((d) => d.trim().toUpperCase().slice(0, 3)).filter(Boolean))
   .pipe(z.array(z.enum(DAYS)).min(1));
-
 const EnvSchema = z.object({
   // --- platform credentials ---
   MAX_API_KEY: z
@@ -28,9 +27,16 @@ const EnvSchema = z.object({
     .string()
     .min(10, 'OVERLOOP_API_KEY looks too short — check the value in .env')
     .optional(),
+  HEYREACH_API_KEY: z
+    .string()
+    .min(10, 'HEYREACH_API_KEY looks too short — check the value in .env')
+    .optional(),
   MAX_BUSINESS_ID: z.coerce.number().int().min(0).default(0).describe('0 = not chosen yet (run npm run setup)'),
   MAX_API_URL: z.string().url().default('https://api.yourmax.ai/api/v1'),
   OVERLOOP_API_URL: z.string().url().default('https://api.overloop.ai/public/v2'),
+  HEYREACH_API_URL: z.string().url().default('https://api.heyreach.io/api/public'),
+  HEYREACH_CAMPAIGN_ID: z.coerce.number().int().min(0).default(0).describe('existing HeyReach campaign; 0 = not configured'),
+  HEYREACH_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(300).default(60),
 
   // --- safety ---
   SEND_MODE: z.enum(['locked', 'live']).default('locked'),

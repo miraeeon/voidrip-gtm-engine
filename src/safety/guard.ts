@@ -16,6 +16,7 @@
  */
 
 export type SendMode = 'locked' | 'live';
+export type OutboundAction = 'SAFE_WRITE' | 'SEND_CAPABLE';
 
 export class SafetyError extends Error {
   constructor(message: string) {
@@ -29,6 +30,9 @@ export interface AuditEntry {
   service: string;
   method: string;
   path: string;
+  action?: OutboundAction;
+  operation?: string;
+  target?: string;
   allowed: boolean;
   reason?: string;
   summary?: string;
@@ -40,10 +44,55 @@ export interface GuardContext {
   allowSend?: boolean;
 }
 
+export interface OutboundOperation extends GuardContext {
+  adapter: string;
+  operation: string;
+  target: string;
+  reason?: string;
+  summary?: string;
+}
+
+/** Provider-neutral policy. Adapters classify every write before reaching the network. */
+export class OutboundSafetyGuard {
+  constructor(private readonly mode: SendMode, private readonly audit: AuditSink = () => {}) {}
+
+  get sendMode(): SendMode {
+    return this.mode;
+  }
+
+  check(action: OutboundAction, operation: OutboundOperation): void {
+    const allowed = action === 'SAFE_WRITE' || (this.mode === 'live' && operation.allowSend === true);
+    const reason = operation.reason ?? (action === 'SEND_CAPABLE' ? 'operation can contact a real person' : undefined);
+    this.audit({
+      at: new Date().toISOString(),
+      service: operation.adapter,
+      method: operation.operation,
+      path: operation.target,
+      action,
+      operation: operation.operation,
+      target: operation.target,
+      allowed,
+      reason,
+      summary: operation.summary,
+    });
+    if (!allowed) {
+      const why =
+        this.mode === 'locked'
+          ? `${reason} (SEND_MODE=locked)`
+          : `${reason} (live mode requires explicit allowSend for this call)`;
+      throw new SafetyError(why);
+    }
+  }
+}
+
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 export class SendGuard {
-  constructor(private readonly mode: SendMode, private readonly audit: AuditSink = () => {}) {}
+  private readonly outbound: OutboundSafetyGuard;
+
+  constructor(private readonly mode: SendMode, audit: AuditSink = () => {}) {
+    this.outbound = new OutboundSafetyGuard(mode, audit);
+  }
 
   get sendMode(): SendMode {
     return this.mode;
@@ -54,24 +103,14 @@ export class SendGuard {
     const m = method.toUpperCase();
     if (!WRITE_METHODS.has(m)) return;
     const reason = this.violation(m, path, body);
-    const sendCapable = reason !== null;
-    const allowed = !sendCapable || (this.mode === 'live' && ctx.allowSend === true);
-    this.audit({
-      at: new Date().toISOString(),
-      service: 'overloop',
-      method: m,
-      path,
-      allowed,
+    this.outbound.check(reason ? 'SEND_CAPABLE' : 'SAFE_WRITE', {
+      adapter: 'overloop',
+      operation: `${m} ${path}`,
+      target: path,
+      allowSend: ctx.allowSend,
       reason: reason ?? undefined,
       summary: summarize(body),
     });
-    if (!allowed) {
-      const why =
-        this.mode === 'locked'
-          ? `${reason} (SEND_MODE=locked)`
-          : `${reason} (live mode requires explicit allowSend for this call)`;
-      throw new SafetyError(why);
-    }
   }
 
   /** Returns a description of the send-capable effect, or null if the write is inert. */
