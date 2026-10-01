@@ -87,10 +87,10 @@ describe('Market Map local E2E', () => {
       candidate_id: candidate.id,
       project_id: resolution.project_id,
       source_signal_id: 'signal-world-one-1',
-      signal_type: 'PROJECT_UPDATE',
+      signal_type: 'EXPLICIT_STRUCTURAL_NEED',
       source: 'public-project-site',
       event_date: '2026-09-30',
-      evidence: 'World One published a new cross-format project update.',
+      evidence: 'The founder explicitly says the project lacks a coherent structure across formats and asks for a structural method.',
       strength: 3,
       mentionability: 'YES',
     }]);
@@ -214,7 +214,7 @@ describe('Market Map local E2E', () => {
     expect(getDailyBuffer(20)).toMatchObject({ target: 20, ready: 0, deficit: 20, complete: false, provider_action: 'NONE' });
   });
 
-  it('refuses Tier A/B activation without a dated public signal', () => {
+  it('requires an explicit unresolved structural need and excludes current YC participants', () => {
     const imported = ingestCandidates({ source: 'manual', source_lane_id: 'V-A', records: [record('guard-1')] });
     const project = saveProjectResolution({
       candidate_id: imported.candidate_ids[0]!, name: 'World One', url: 'https://world.example/one',
@@ -227,9 +227,28 @@ describe('Market Map local E2E', () => {
       strategic_authority: 'INDIVIDUAL', ambition: 'HIGH', intrinsic_complexity: 'HIGH', professional_project_visibility: 'ALIGNED',
       failed_gates: [], missing_evidence: [], evidence_summary: 'All gates evidenced.', confidence: 'HIGH', reasoning: 'All gates evidenced.',
     }]);
-    expect(() => saveActivationScores([{
+    const activation = {
       candidate_id: imported.candidate_ids[0]!, project_id: project.project_id, intent_strength: 5, freshness: 'CURRENT',
       priority_tier: 'A', route: 'linkedin', angle: 'world coherence', channel_plan: null, reasoning: 'Would otherwise qualify.',
-    }])).toThrow(/requires at least one evidenced public signal/);
+    } as const;
+    expect(() => saveActivationScores([activation])).toThrow(/requires explicit evidence of a current unresolved structural need/);
+
+    saveSignalEvents([{
+      candidate_id: imported.candidate_ids[0]!, project_id: project.project_id,
+      source_signal_id: 'project-update', signal_type: 'PROJECT_UPDATE', source: 'project-site',
+      event_date: '2026-09-30', evidence: 'The project launched a new feature.', strength: 4, mentionability: 'YES',
+    }]);
+    expect(() => saveActivationScores([activation])).toThrow(/requires explicit evidence of a current unresolved structural need/);
+
+    saveSignalEvents([{
+      candidate_id: imported.candidate_ids[0]!, project_id: project.project_id,
+      source_signal_id: 'structural-need', signal_type: 'EXPLICIT_STRUCTURAL_NEED', source: 'founder-post',
+      event_date: '2026-09-30', evidence: 'The founder explicitly says the project lacks a coherent system structure.', strength: 5, mentionability: 'YES',
+    }, {
+      candidate_id: imported.candidate_ids[0]!, project_id: project.project_id,
+      source_signal_id: 'yc-current', signal_type: 'CURRENT_YC_PROGRAM', source: 'y-combinator',
+      event_date: '2026-09-30', evidence: 'The founder is currently participating in the Y Combinator program.', strength: 5, mentionability: 'YES',
+    }]);
+    expect(() => saveActivationScores([activation])).toThrow(/excludes people currently in a Y Combinator program/);
   });
 });

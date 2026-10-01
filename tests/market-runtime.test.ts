@@ -35,7 +35,7 @@ function seedReviewReady() {
   );
   run(
     `INSERT INTO signal_events(candidate_id,project_id,signal_type,source,url,event_date,evidence,strength,mentionability,created_at)
-     VALUES (?,?,'PROJECT_UPDATE','project-site','https://world.example/update','2026-09-30','A new chapter launched.',3,'YES',?)`,
+     VALUES (?,?,'EXPLICIT_STRUCTURAL_NEED','founder-post','https://world.example/update','2026-09-30','Founder explicitly states that the project lacks a coherent cross-format structure.',5,'YES',?)`,
     candidateId, projectId, at,
   );
   const activation = run(

@@ -3,6 +3,7 @@ import { getPlaybook } from '../pipeline/playbook.js';
 import { getSellerProfile } from '../pipeline/setup.js';
 import { lintSequence, SequenceInput } from '../pipeline/sequence.js';
 import { CandidateSequenceInput } from './contracts.js';
+import { activationEligibleSignalSql, outsideCurrentYcProgramSql } from './activation-eligibility.js';
 
 function parseJson<T>(value: string | null, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
@@ -24,6 +25,8 @@ export function getMarketDraftingQueue(limit = 25) {
        )
       WHERE c.state IN ('ACTIVATION_READY','DRAFTED')
         AND a.route != 'none'
+        AND ${activationEligibleSignalSql('c.id', 'p.id')}
+        AND ${outsideCurrentYcProgramSql('c.id', 'p.id')}
         AND NOT EXISTS (
           SELECT 1 FROM candidate_sequences s
            WHERE s.candidate_id = c.id AND s.project_id = p.id AND s.status = 'final'
@@ -139,6 +142,8 @@ export function getMarketReviewQueue(limit = 25) {
        )
        JOIN activation_scores a ON a.id = s.activation_score_id
       WHERE s.status = 'final' AND s.review_status = 'pending'
+        AND ${activationEligibleSignalSql('s.candidate_id', 's.project_id')}
+        AND ${outsideCurrentYcProgramSql('s.candidate_id', 's.project_id')}
       ORDER BY CASE a.priority_tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 ELSE 2 END,
                COALESCE(a.intent_strength, 0) DESC, s.created_at ASC
       LIMIT ?`,

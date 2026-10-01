@@ -73,7 +73,7 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
   def({
     name: 'gtm_get_signal_queue',
     title: 'Qualified prospects needing public signal refresh',
-    description: 'PASS_OUTBOUND_V1 Person + Project records that need current public evidence before activation.',
+    description: 'PASS_OUTBOUND_V1 Person + Project records that need explicit public evidence of a current unresolved structural need. MVP activity, product launches, product feedback and company/YC pages are Market Map evidence only.',
     input: { limit: z.number().int().min(1).max(100).default(20) },
     readOnly: true,
     handler: (args) => getSignalQueue(args.limit),
@@ -81,14 +81,14 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
   def({
     name: 'gtm_save_signal_events',
     title: 'Save public intent signals separately from fit',
-    description: 'Upsert dated, evidenced public signals. FIT is unchanged and signal mentionability remains explicit.',
+    description: 'Upsert dated, evidenced public observations. Only EXPLICIT_STRUCTURAL_NEED, RESTRUCTURING_NEED or STRUCTURAL_PHASE_TRANSITION can support activation; current YC participation blocks activation.',
     input: { items: z.array(SignalEventInput).min(1).max(100) },
     handler: (args) => saveSignalEvents(args.items),
   }),
   def({
     name: 'gtm_get_priority_queue',
     title: 'Qualified prospects needing activation priority',
-    description: 'Only PASS_OUTBOUND_V1 records. FIT is fixed; use signals and timing to decide priority, intent and route.',
+    description: 'Only PASS_OUTBOUND_V1 records. FIT is fixed; Tier A/B requires explicit current unresolved structural need evidence and excludes current YC participants.',
     input: { limit: z.number().int().min(1).max(100).default(25) },
     readOnly: true,
     handler: (args) => getPriorityQueue(args.limit),
@@ -96,7 +96,7 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
   def({
     name: 'gtm_save_activation_scores',
     title: 'Save intent and activation priority',
-    description: 'Persist intent, freshness, A/B/C/DQ priority, route and angle without changing Boundary status.',
+    description: 'Persist intent, freshness, A/B/C/DQ priority, route and angle without changing Boundary status. Tier A/B is rejected without explicit structural-need evidence or during current YC participation.',
     input: { items: z.array(ActivationScoreInput).min(1).max(100) },
     handler: (args) => saveActivationScores(args.items),
   }),

@@ -48,3 +48,7 @@ Company size, funding, bootstrap status, AI use, title, geography, age, maturity
 Return `boundary_status`, primary/secondary Kernel, `project_real`, `strategic_authority`, `ambition`, `intrinsic_complexity`, `professional_project_visibility`, `failed_gates`, `missing_evidence`, `evidence_summary`, `confidence`, and `boundary_version: GTM_BOUNDARY_V1`.
 
 Do not infer solo authority from `Founder`, complexity from feature count, ambition from marketing language, an independent project from an employer, a Need Territory from a Kernel, or BOFU from project maturity.
+
+An MVP that is being built, has been built, or has been launched is evidence that an initial project structure already exists. MVP activity, product launch, product feedback, a company page, or a Y Combinator page can support Market Map discovery, but never proves a current VOIDRIP structuring need, intent, BOFU, or activation readiness.
+
+A Person + Project can enter Tier A/B activation only when public evidence explicitly shows a current unresolved structural need, a restructuring need, or a structural phase transition. People currently participating in a Y Combinator program are excluded from outbound activation because they already receive active structuring support. Alumni may remain in the Market Map, but require the same new, explicit structural-need evidence as everyone else.

@@ -4,6 +4,7 @@ import { createDefaultHeyReachAdapter } from '../adapters/runtime.js';
 import type { HeyReachAdapter } from '../adapters/heyreach-execution.js';
 import { all, auditSink, logRun, nowIso, one, run, tx } from '../db/db.js';
 import { normalizeLinkedinUrl } from '../identity/linkedin.js';
+import { activationEligibleSignalSql, outsideCurrentYcProgramSql } from '../market-map/activation-eligibility.js';
 
 type ActivationStatus = 'IMPORT_APPROVED' | 'STAGED' | 'LAUNCH_APPROVED' | 'ACTIVE';
 
@@ -19,6 +20,8 @@ function selectedSequences(candidateIds: number[]) {
        JOIN activation_scores a ON a.id=s.activation_score_id
       WHERE s.status='final' AND s.review_status='pending'
         AND a.priority_tier IN ('A','B') AND s.candidate_id IN (${placeholders})
+        AND ${activationEligibleSignalSql('s.candidate_id', 's.project_id')}
+        AND ${outsideCurrentYcProgramSql('s.candidate_id', 's.project_id')}
       ORDER BY s.id`,
     ...candidateIds,
   );
@@ -28,7 +31,9 @@ function latestReadyCount() {
   return one<{ n: number }>(
     `SELECT COUNT(*) n FROM candidate_sequences s
        JOIN activation_scores a ON a.id=s.activation_score_id
-      WHERE s.status='final' AND s.review_status='pending' AND a.priority_tier IN ('A','B')`,
+      WHERE s.status='final' AND s.review_status='pending' AND a.priority_tier IN ('A','B')
+       AND ${activationEligibleSignalSql('s.candidate_id', 's.project_id')}
+       AND ${outsideCurrentYcProgramSql('s.candidate_id', 's.project_id')}`,
   )?.n ?? 0;
 }
 

@@ -1,6 +1,7 @@
 import { all, one } from '../db/db.js';
 import { getConfig } from '../config.js';
 import { getMarketReviewQueue } from './drafting.js';
+import { activationEligibleSignalSql, outsideCurrentYcProgramSql } from './activation-eligibility.js';
 
 export function getDailyBuffer(limit = getConfig().GTM_DAILY_SEQUENCES) {
   const ready = one<{ n: number }>(
@@ -10,7 +11,9 @@ export function getDailyBuffer(limit = getConfig().GTM_DAILY_SEQUENCES) {
      WHERE s.status = 'final' AND s.review_status = 'pending'
        AND b.boundary_status = 'PASS_OUTBOUND_V1'
        AND a.priority_tier IN ('A','B') AND a.intent_strength BETWEEN 2 AND 5
-       AND a.freshness IN ('CURRENT','RECENT') AND a.route != 'none'`,
+       AND a.freshness IN ('CURRENT','RECENT') AND a.route != 'none'
+       AND ${activationEligibleSignalSql('s.candidate_id', 's.project_id')}
+       AND ${outsideCurrentYcProgramSql('s.candidate_id', 's.project_id')}`,
   )?.n ?? 0;
   const stages = Object.fromEntries(
     all<{ state: string; n: number }>('SELECT state, COUNT(*) n FROM candidates GROUP BY state').map((row) => [row.state, row.n]),
@@ -25,7 +28,7 @@ export function getDailyBuffer(limit = getConfig().GTM_DAILY_SEQUENCES) {
     ready,
     deficit: Math.max(0, limit - ready),
     complete: ready >= limit,
-    quality_floor: 'PASS_OUTBOUND_V1 + current/recent public signal + Tier A/B + clean final LinkedIn sequence',
+    quality_floor: 'PASS_OUTBOUND_V1 + explicit current unresolved structural need + outside current YC program + Tier A/B + clean final LinkedIn sequence',
     provider_action: 'NONE',
     pipeline: { ...stages, signaled },
     items: getMarketReviewQueue(limit),

@@ -20,12 +20,12 @@ If one condition is missing: no final draft, no HeyReach import, and no contact.
 
 | Tier | Meaning | Action |
 |---|---|---|
-| **A** | `PASS_OUTBOUND_V1` plus a current or recent, specific, strong signal; intent 4–5 | First calibration cohort after human approval |
-| **B** | `PASS_OUTBOUND_V1` plus a weaker, indirect, or incomplete signal; intent 2–3 | Small, manually selected calibration batch only |
+| **A** | `PASS_OUTBOUND_V1` plus explicit current evidence of an unresolved structural need; intent 4–5 | First calibration cohort after human approval |
+| **B** | `PASS_OUTBOUND_V1` plus explicit but weaker or incomplete evidence of an unresolved structural need; intent 2–3 | Small, manually selected calibration batch only |
 | **C** | Outbound FIT is valid but activation timing is stale, unknown, or fit-only; intent 1 | Keep in the Market Map until a stronger signal appears |
 | **DQ** | Excluded, already replied, unusable channel, identity conflict, or human no-contact decision | Route `none`; never draft or contact |
 
-Intent scale: 5 = explicit search for a structural answer; 4 = active visible tension; 3 = current project milestone or transition; 2 = relevant but non-decisive activity; 1 = FIT only. Freshness remains separate: `CURRENT`, `RECENT`, `STALE`, or `UNKNOWN`.
+Intent scale: 5 = explicit search for a structural answer; 4 = active visible structural tension; 3 = explicit structural phase transition; 2 = explicit but incomplete evidence of a current unresolved structural need; 1 = FIT only. Freshness remains separate: `CURRENT`, `RECENT`, `STALE`, or `UNKNOWN`. MVP activity, product launch, product feedback, company pages and Y Combinator pages are Market Map evidence only and never raise intent by themselves. Current Y Combinator participants are excluded from activation.
 
 ## 3. Channel rules
 

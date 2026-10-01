@@ -20,7 +20,7 @@ Daily loop: gtm_get_activation_readiness -> gtm_sync_heyreach_results -> gtm_syn
 Local E2E: gtm_ingest_candidates -> gtm_get_resolution_queue -> gtm_save_project_resolution -> gtm_get_boundary_queue -> gtm_save_boundary_qualifications -> gtm_get_priority_queue -> gtm_save_activation_scores -> gtm_get_market_drafting_queue -> gtm_save_candidate_sequence -> gtm_get_market_review_queue.
 HeyReach V1 uses two distinct gates: gtm_approve_heyreach_import then gtm_stage_heyreach_import; later gtm_approve_heyreach_launch then gtm_launch_heyreach. Never combine the approvals. Adding approved leads targets the configured lead list while the campaign remains DRAFT.
 Results and learning: provider events, exact replies, Scan and sales stay tied to Person + Project. Learning creates a proposal; a human separately approves it. The Boundary is never changed automatically.
-Rules: the public project signal is the hook; every message must be specific to one person; never invent facts; never send a reply automatically.
+Rules: only explicit evidence of a current unresolved structural need can unlock activation. MVP activity, product launches, product feedback, company pages and YC pages are Market Map evidence only. Current YC participants are excluded. Every message must be specific to one person; never invent facts; never send a reply automatically.
 Safety: SEND_MODE=${safeMode()} — in locked mode campaign launch is blocked in code. Provider import also requires explicit allowImport. Never try to work around the SafetyGuard.${UNATTENDED ? ' This is an unattended run: provider writes, approvals, launch, reply triage, learning application, simulations and source-control mutations are not exposed.' : ''}`;
 
 function safeMode() {

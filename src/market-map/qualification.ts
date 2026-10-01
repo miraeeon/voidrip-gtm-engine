@@ -1,5 +1,6 @@
 import { all, logRun, nowIso, one, run, tx } from '../db/db.js';
 import { applyRoutingRules } from '../pipeline/route.js';
+import { getActivationEligibility } from './activation-eligibility.js';
 import {
   ActivationScoreInput,
   BoundaryQualificationInput,
@@ -157,6 +158,7 @@ export function getPriorityQueue(limit = 25) {
   ).map((item) => ({
     ...item,
     signals: all<any>('SELECT * FROM signal_events WHERE candidate_id = ? AND project_id = ? ORDER BY created_at DESC', item.id, item.project_id),
+    activation_eligibility: getActivationEligibility(item.id, item.project_id),
   }));
 }
 
@@ -171,13 +173,14 @@ export function saveActivationScores(items: unknown[]) {
         input.project_id,
       );
       if (!boundary || boundary.boundary_status !== 'PASS_OUTBOUND_V1') throw new Error('activation scoring requires PASS_OUTBOUND_V1');
-      const signalCount = one<{ n: number }>(
-        'SELECT COUNT(*) n FROM signal_events WHERE candidate_id = ? AND project_id = ?',
-        input.candidate_id,
-        input.project_id,
-      )?.n ?? 0;
       if (['A', 'B'].includes(input.priority_tier)) {
-        if (signalCount === 0) throw new Error('Tier A/B activation requires at least one evidenced public signal');
+        const eligibility = getActivationEligibility(input.candidate_id, input.project_id);
+        if (eligibility.currentYcProgramSignals.length > 0) {
+          throw new Error('Tier A/B activation excludes people currently in a Y Combinator program');
+        }
+        if (eligibility.eligibleSignalTypes.length === 0) {
+          throw new Error('Tier A/B activation requires explicit evidence of a current unresolved structural need');
+        }
         if (!['CURRENT', 'RECENT'].includes(input.freshness)) throw new Error('Tier A/B activation requires current or recent evidence');
         if (input.priority_tier === 'A' && (input.intent_strength ?? 0) < 4) throw new Error('Tier A requires intent strength 4-5');
         if (input.priority_tier === 'B' && ((input.intent_strength ?? 0) < 2 || (input.intent_strength ?? 0) > 3)) {
