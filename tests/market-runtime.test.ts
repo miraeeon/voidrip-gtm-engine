@@ -67,8 +67,8 @@ function readiness(leadCount = 0): HeyReachReadiness {
     leadCount: 0,
     inert: true,
     leadList: { id: 71, name: 'Approved prospects', count: leadCount },
-    availableAccounts: [{ id: 11, name: 'Jen Veyre', active: true }],
-    assignedAccounts: [{ id: 11, name: 'Jen Veyre', active: true }],
+    availableAccounts: [{ id: 11, name: 'Jen Veyre', authValid: true }],
+    assignedAccounts: [{ id: 11, name: 'Jen Veyre', authValid: true }],
     sequence: {
       nodeCount: 6,
       requiredVariables: ['FIRST_NAME', 'platform', 'specific_observation', 'specific_observation_2', 'specific_project'],

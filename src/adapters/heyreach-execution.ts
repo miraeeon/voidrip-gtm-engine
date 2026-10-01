@@ -10,8 +10,8 @@ export interface HeyReachCampaignInspection {
 
 export interface HeyReachReadiness extends HeyReachCampaignInspection {
   leadList: { id: number; name: string; count: number } | null;
-  availableAccounts: { id: number; name: string; active: boolean }[];
-  assignedAccounts: { id: number; name: string; active: boolean }[];
+  availableAccounts: { id: number; name: string; authValid: boolean }[];
+  assignedAccounts: { id: number; name: string; authValid: boolean }[];
   sequence: { nodeCount: number; requiredVariables: string[] };
   blockers: string[];
   readyForImportApproval: boolean;
@@ -69,14 +69,14 @@ export class HeyReachAdapter {
     const availableAccounts = accountsPage.items.map((account) => ({
       id: account.id,
       name: [account.firstName, account.lastName].filter(Boolean).join(' ') || `Account ${account.id}`,
-      active: account.isActive === true,
+      authValid: account.authIsValid === true,
     }));
     const assignedAccounts = inspection.campaign.campaignAccountIds.map((id) => {
       const account = accountsById.get(id);
       return {
         id,
         name: [account?.firstName, account?.lastName].filter(Boolean).join(' ') || `Account ${id}`,
-        active: account?.isActive === true,
+        authValid: account?.authIsValid === true,
       };
     });
     const sequenceSummary = inspectSequence(sequence);
@@ -86,8 +86,8 @@ export class HeyReachAdapter {
     if (!inspection.inert) blockers.push('campaign has leads in progress');
     if (!leadList || leadList.listType !== 'USER_LIST') blockers.push('configured campaign lead list is missing or invalid');
     if (assignedAccounts.length === 0) blockers.push('no LinkedIn sender account is assigned to the campaign');
-    if (!availableAccounts.some((account) => account.active)) blockers.push('no active LinkedIn sender account is available in HeyReach');
-    if (assignedAccounts.some((account) => !account.active)) blockers.push('an assigned LinkedIn sender account is inactive');
+    if (!availableAccounts.some((account) => account.authValid)) blockers.push('no LinkedIn sender with valid authentication is available in HeyReach');
+    if (assignedAccounts.some((account) => !account.authValid)) blockers.push('an assigned LinkedIn sender has invalid authentication');
     for (const variable of required) {
       if (!sequenceSummary.requiredVariables.includes(variable)) blockers.push(`sequence is missing {${variable}}`);
     }

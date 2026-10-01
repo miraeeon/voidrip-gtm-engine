@@ -47,6 +47,8 @@ export interface HeyReachAccount {
   lastName?: string | null;
   emailAddress?: string | null;
   isActive?: boolean;
+  authIsValid?: boolean;
+  activeCampaigns?: number;
   status?: string | null;
 }
 

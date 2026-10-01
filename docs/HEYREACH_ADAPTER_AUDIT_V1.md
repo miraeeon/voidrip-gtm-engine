@@ -13,8 +13,8 @@ Status: campagne existante inspectée en lecture seule ; aucune campagne créée
 - cinq exclusions de sécurité visibles et activées ;
 - séquence présente : invitation LinkedIn puis M1–M5 avec délais ;
 - séquence API revalidée : 15 nœuds et variables `FIRST_NAME`, `specific_project`, `platform`, `specific_observation`, `specific_observation_2` présentes ;
-- aucun compte LinkedIn n’est actuellement assigné à la campagne ;
-- le seul compte visible dans le workspace est inactif ;
+- le compte LinkedIn Jen Veyre est authentifié (`authIsValid=true`) et assigné à la campagne ;
+- `isActive=false` signifie qu’aucune campagne n’est en cours sur ce compte, pas que son authentification est invalide ;
 - scheduler local non installé et désactivé par défaut.
 
 Cette campagne est la cible autoritative de l'adapter V1. Le moteur ne doit pas créer de campagne de remplacement.

@@ -93,7 +93,7 @@ describe('HeyReach adapter', () => {
       }),
       'POST /campaign/GetLeadsFromCampaign': () => ({ totalCount: 0, items: [] }),
       'GET /list/GetById': () => ({ id: 71, name: 'Approved prospects', listType: 'USER_LIST', totalItemsCount: 20 }),
-      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', isActive: true }] }),
+      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', authIsValid: true }] }),
       'GET /campaign/GetCampaignSequence': () => ({
         message: '{FIRST_NAME} {specific_project} {platform} {specific_observation} {specific_observation_2}',
       }),
@@ -102,12 +102,12 @@ describe('HeyReach adapter', () => {
     const readiness = await new HeyReachAdapter(client, 623081).inspectReadiness();
     expect(readiness).toMatchObject({
       blockers: [], readyForImportApproval: true, readyForLaunchApproval: true,
-      leadList: { id: 71, count: 20 }, assignedAccounts: [{ id: 11, active: true }],
+      leadList: { id: 71, count: 20 }, assignedAccounts: [{ id: 11, authValid: true }],
     });
     expect(fake.calls.every((call) => !call.url.includes('AddLeads') && !call.url.includes('StartCampaign'))).toBe(true);
   });
 
-  it('surfaces an unassigned inactive sender account as a launch blocker', async () => {
+  it('surfaces an unassigned sender with invalid authentication as a launch blocker', async () => {
     freshEnv({ SEND_MODE: 'locked' });
     const fake = fakeFetch({
       'GET /campaign/GetById': () => ({
@@ -116,7 +116,7 @@ describe('HeyReach adapter', () => {
       }),
       'POST /campaign/GetLeadsFromCampaign': () => ({ totalCount: 0, items: [] }),
       'GET /list/GetById': () => ({ id: 71, name: 'Approved prospects', listType: 'USER_LIST', totalItemsCount: 0 }),
-      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', isActive: false }] }),
+      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', authIsValid: false }] }),
       'GET /campaign/GetCampaignSequence': () => ({
         message: '{FIRST_NAME} {specific_project} {platform} {specific_observation} {specific_observation_2}',
       }),
@@ -127,7 +127,7 @@ describe('HeyReach adapter', () => {
     expect(readiness.readyForLaunchApproval).toBe(false);
     expect(readiness.blockers).toEqual(expect.arrayContaining([
       'no LinkedIn sender account is assigned to the campaign',
-      'no active LinkedIn sender account is available in HeyReach',
+      'no LinkedIn sender with valid authentication is available in HeyReach',
     ]));
   });
 
