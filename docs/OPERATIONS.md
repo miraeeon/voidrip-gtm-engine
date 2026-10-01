@@ -1,5 +1,7 @@
 # Operations runbook
 
+> **Runbook VOIDRIP actif :** [VOIDRIP_GTM_V1.md](VOIDRIP_GTM_V1.md). Les opérations Max/Overloop ci-dessous sont héritées et ne doivent pas être utilisées pour la campagne VOIDRIP V1.
+
 ## The daily run
 
 `npm run daily` (and the scheduled task) runs `node bin/gtm.mjs daily`, which works in this order:

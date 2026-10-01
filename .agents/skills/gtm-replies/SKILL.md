@@ -5,20 +5,20 @@ description: Handle prospect replies for VOIDRIP GTM — detect replies from the
 
 # Handle replies
 
-Overloop's public API tells us **that** someone replied, through reply counts on the prospect. It does not tell us **what** they said. You close that gap.
+HeyReach is the V1 execution provider. Reply handling remains provider-bounded and human-controlled.
 
-1. **Detect.** Call `gtm_sync_results`, which also detects replies, then `gtm_get_reply_queue`.
+1. **Detect.** Call `gtm_sync_heyreach_results`, `gtm_sync_heyreach_replies`, then `gtm_get_market_reply_queue`.
 2. **Fetch missing text.** For each item in `needs_text`:
-   - If a mailbox tool is available (Gmail or Outlook MCP), search for the prospect's latest message. For example, Gmail: `from:<prospect email> newer_than:14d`. Pass the body, without quoted history, to `gtm_ingest_reply` with that `reply_id`.
-   - For LinkedIn replies, or when there's no mailbox access, list the names for the user and ask them to paste the text. `gtm reply-add --lead <id> --text "…"` also works.
+   - HeyReach chatroom data is preferred when it contains the exact inbound text.
+   - If text is still missing, list the names for the user and ask them to paste it. Pass only the exact body to `gtm_ingest_market_reply`.
    - Never guess what someone said.
-3. **Triage.** For each item in `to_triage`, call `gtm_save_reply_triage` with the following:
+3. **Triage.** For each item in `to_triage`, call `gtm_save_market_reply_triage` with the following:
    - `category`:
      - `interested`: wants a call or demo, or says "send it over".
      - `question`: asks something before deciding.
      - `objection`: price, timing, "we already use X".
      - `not_now`: set `follow_up_on`.
-     - `referral`: fill in `referral`.
+     - `referral`: record the referred person in `summary` and `next_action`.
      - `not_interested`
      - `unsubscribe`: any "remove me" or "stop" request, however polite.
      - `out_of_office`: set `follow_up_on` to the day after their return.
@@ -35,9 +35,8 @@ Overloop's public API tells us **that** someone replied, through reply counts on
 4. **Check the safe actions.** The engine runs them automatically:
    - exclusion list for unsubscribe, not interested and wrong person;
    - stop the sequence when a human answered;
-   - assign the Overloop conversation for hot replies.
 
-   Read `actions` in the response and report any failures.
+   Read `actions` in the response and report any failures. The drafted answer is never sent by the engine.
 5. **Summarize for the user.** List hot replies first, each with its drafted answer, and say what was handled automatically.
-   - **Never send an answer yourself.** Humans send replies from Overloop or their mailbox.
-   - When the user confirms they handled one, call `gtm_resolve_reply`, using `outcome: "meeting_booked"` if a meeting was booked.
+   - **Never send an answer yourself.** Humans send replies from HeyReach or LinkedIn.
+   - When the user confirms they handled one, call `gtm_resolve_market_reply`, using `outcome: "meeting_booked"` if a meeting was booked.

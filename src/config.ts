@@ -57,7 +57,7 @@ const EnvSchema = z.object({
   GTM_ENRICH_FROM_OVERLOOP: bool.default(true),
 
   // --- scheduler / daily runner ---
-  GTM_SCHEDULE_ENABLED: bool.default(true),
+  GTM_SCHEDULE_ENABLED: bool.default(false),
   GTM_SCHEDULE_TIME: hhmm.default('08:00'),
   GTM_SCHEDULE_DAYS: dayList.default(['MON', 'TUE', 'WED', 'THU', 'FRI']),
   GTM_AGENT_CMD: z.string().default('codex').describe('Codex CLI command used by the daily runner'),

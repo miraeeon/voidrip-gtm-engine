@@ -73,6 +73,64 @@ describe('HeyReach adapter', () => {
     expect(fake.calls).toHaveLength(1);
   });
 
+  it('requires explicit import approval but allows safe lead-list staging while locked', async () => {
+    freshEnv({ SEND_MODE: 'locked' });
+    const fake = fakeFetch({ 'POST /list/AddLeadsToListV2': () => ({ addedLeadsCount: 1 }) });
+    const client = new HeyReachClient({ apiKey: 'test-heyreach-key', baseUrl: 'https://heyreach.test/api/public', fetchImpl: fake.fn });
+    const lead = { firstName: 'Ari', lastName: 'Builder', profileUrl: 'https://linkedin.com/in/ari-builder' };
+    expect(() => client.addLeadsToList(71, [lead])).toThrow(/allowImport/);
+    await expect(client.addLeadsToList(71, [lead], { allowImport: true })).resolves.toMatchObject({ addedLeadsCount: 1 });
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]).toMatchObject({ method: 'POST', body: { listId: 71, leads: [lead] } });
+  });
+
+  it('reports sequence, lead-list and sender readiness without mutating HeyReach', async () => {
+    freshEnv({ SEND_MODE: 'locked' });
+    const fake = fakeFetch({
+      'GET /campaign/GetById': () => ({
+        id: 623081, name: 'VOIDRIP', status: 'DRAFT', linkedInUserListId: 71,
+        campaignAccountIds: [11], progressStats: { totalUsersInProgress: 0 },
+      }),
+      'POST /campaign/GetLeadsFromCampaign': () => ({ totalCount: 0, items: [] }),
+      'GET /list/GetById': () => ({ id: 71, name: 'Approved prospects', listType: 'USER_LIST', totalItemsCount: 20 }),
+      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', isActive: true }] }),
+      'GET /campaign/GetCampaignSequence': () => ({
+        message: '{FIRST_NAME} {specific_project} {platform} {specific_observation} {specific_observation_2}',
+      }),
+    });
+    const client = new HeyReachClient({ apiKey: 'test-heyreach-key', baseUrl: 'https://heyreach.test/api/public', fetchImpl: fake.fn });
+    const readiness = await new HeyReachAdapter(client, 623081).inspectReadiness();
+    expect(readiness).toMatchObject({
+      blockers: [], readyForImportApproval: true, readyForLaunchApproval: true,
+      leadList: { id: 71, count: 20 }, assignedAccounts: [{ id: 11, active: true }],
+    });
+    expect(fake.calls.every((call) => !call.url.includes('AddLeads') && !call.url.includes('StartCampaign'))).toBe(true);
+  });
+
+  it('surfaces an unassigned inactive sender account as a launch blocker', async () => {
+    freshEnv({ SEND_MODE: 'locked' });
+    const fake = fakeFetch({
+      'GET /campaign/GetById': () => ({
+        id: 623081, name: 'VOIDRIP', status: 'DRAFT', linkedInUserListId: 71,
+        campaignAccountIds: [], progressStats: { totalUsersInProgress: 0 },
+      }),
+      'POST /campaign/GetLeadsFromCampaign': () => ({ totalCount: 0, items: [] }),
+      'GET /list/GetById': () => ({ id: 71, name: 'Approved prospects', listType: 'USER_LIST', totalItemsCount: 0 }),
+      'POST /li_account/GetAll': () => ({ totalCount: 1, items: [{ id: 11, firstName: 'Jen', lastName: 'Veyre', isActive: false }] }),
+      'GET /campaign/GetCampaignSequence': () => ({
+        message: '{FIRST_NAME} {specific_project} {platform} {specific_observation} {specific_observation_2}',
+      }),
+    });
+    const client = new HeyReachClient({ apiKey: 'test-heyreach-key', baseUrl: 'https://heyreach.test/api/public', fetchImpl: fake.fn });
+    const readiness = await new HeyReachAdapter(client, 623081).inspectReadiness();
+    expect(readiness.readyForImportApproval).toBe(true);
+    expect(readiness.readyForLaunchApproval).toBe(false);
+    expect(readiness.blockers).toEqual(expect.arrayContaining([
+      'no LinkedIn sender account is assigned to the campaign',
+      'no active LinkedIn sender account is available in HeyReach',
+    ]));
+  });
+
   it('requires an explicit existing campaign id', async () => {
     freshEnv({ SEND_MODE: 'locked' });
     const client = new HeyReachClient({ apiKey: 'test-heyreach-key', baseUrl: 'https://heyreach.test/api/public', fetchImpl: fakeFetch({}).fn });

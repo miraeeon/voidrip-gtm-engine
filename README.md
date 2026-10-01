@@ -1,3 +1,5 @@
+> **VOIDRIP V1 :** le guide actif est [docs/VOIDRIP_GTM_V1.md](docs/VOIDRIP_GTM_V1.md). Les sections Max/Overloop ci-dessous appartiennent au repo amont et sont conservées comme référence historique ; elles ne gouvernent pas le chemin Market Map → Codex → HeyReach et ne doivent pas servir à activer la campagne.
+
 <div align="center">
 
 # voidrip-gtm-engine
@@ -7,8 +9,8 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)
 ![Node 22.13+](https://img.shields.io/badge/node-22.13%2B-339933.svg)
 ![Runs on Codex](https://img.shields.io/badge/runs%20on-Codex-111827.svg)
-![Leads from max](https://img.shields.io/badge/leads%20from-max-EE5D8B.svg)
-![MCP server](https://img.shields.io/badge/MCP-42%20tools-7c3aed.svg)
+![Execution with HeyReach](https://img.shields.io/badge/execution-HeyReach-6C5CE7.svg)
+![MCP server](https://img.shields.io/badge/MCP-66%20tools-7c3aed.svg)
 ![Send mode locked by default](https://img.shields.io/badge/send%20mode-locked%20by%20default-success.svg)
 
 **Max and Overloop are optional bundled adapters. [Codex](https://developers.openai.com/codex/) is the qualification and orchestration engine.**

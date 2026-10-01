@@ -37,6 +37,7 @@ describe('config', () => {
     expect(toMinutes(c.OVERLOOP_SEND_START)).toBe(495);
     expect(() => parseConfig({ ...env, GTM_SCHEDULE_TIME: '25:00' })).toThrow(/HH:MM/);
     expect(parseConfig({}).MAX_API_KEY).toBeUndefined();
+    expect(parseConfig({}).GTM_SCHEDULE_ENABLED).toBe(false);
     expect(parseConfig({}).GTM_AGENT_CMD).toBe('codex');
     expect(parseConfig({}).GTM_MODEL).toBe('');
     expect(() => parseConfig({ ...env, MAX_API_KEY: 'short' })).toThrow(/looks too short/);
@@ -69,7 +70,11 @@ describe('ops', () => {
   });
 
   it('removes sensitive tools from unattended MCP runtimes', () => {
-    for (const name of ['gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop', 'gtm_push_to_overloop']) {
+    for (const name of [
+      'gtm_approve', 'gtm_launch', 'gtm_cleanup_overloop', 'gtm_push_to_overloop',
+      'gtm_approve_heyreach_import', 'gtm_stage_heyreach_import', 'gtm_approve_heyreach_launch',
+      'gtm_launch_heyreach', 'gtm_save_market_reply_triage', 'gtm_record_market_outcome', 'gtm_review_market_learning',
+    ]) {
       expect(UNATTENDED_TOOL_NAMES).toContain(name);
       expect(toolAllowedInRuntime(name, true)).toBe(false);
       expect(toolAllowedInRuntime(name, false)).toBe(true);

@@ -50,7 +50,7 @@ export async function doctor(opts: { source?: ManagedSourceAdapter; execution?: 
   const out: Record<string, unknown> = {
     send_mode: cfg.SEND_MODE,
     daily_review_target: cfg.GTM_DAILY_SEQUENCES,
-    active_path: 'Drive Market Map → Codex → local review → explicit HeyReach import',
+    active_path: 'Drive Market Map → Codex → human review → gated HeyReach list import → gated launch',
     market_map: {
       ok: true,
       candidates: one<{ n: number }>('SELECT COUNT(*) n FROM candidates')?.n ?? 0,
@@ -64,13 +64,17 @@ export async function doctor(opts: { source?: ManagedSourceAdapter; execution?: 
     },
   };
   try {
-    const inspection = await createDefaultHeyReachAdapter(auditSink).inspectConfiguredCampaign();
+    const inspection = await createDefaultHeyReachAdapter(auditSink).inspectReadiness();
     out.heyreach = {
-      ok: true,
+      ok: inspection.blockers.length === 0,
       campaign_id: inspection.campaign.id,
       status: inspection.campaign.status,
       leads: inspection.leadCount,
       inert: inspection.inert,
+      lead_list: inspection.leadList,
+      assigned_accounts: inspection.assignedAccounts,
+      sequence: inspection.sequence,
+      blockers: inspection.blockers,
     };
   } catch (e) {
     out.heyreach = { ok: false, error: (e as Error).message };

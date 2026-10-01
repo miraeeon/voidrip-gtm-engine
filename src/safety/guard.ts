@@ -16,7 +16,7 @@
  */
 
 export type SendMode = 'locked' | 'live';
-export type OutboundAction = 'SAFE_WRITE' | 'SEND_CAPABLE';
+export type OutboundAction = 'SAFE_WRITE' | 'IMPORT_CAPABLE' | 'SEND_CAPABLE';
 
 export class SafetyError extends Error {
   constructor(message: string) {
@@ -41,6 +41,7 @@ export interface AuditEntry {
 export type AuditSink = (e: AuditEntry) => void;
 
 export interface GuardContext {
+  allowImport?: boolean;
   allowSend?: boolean;
 }
 
@@ -61,8 +62,16 @@ export class OutboundSafetyGuard {
   }
 
   check(action: OutboundAction, operation: OutboundOperation): void {
-    const allowed = action === 'SAFE_WRITE' || (this.mode === 'live' && operation.allowSend === true);
-    const reason = operation.reason ?? (action === 'SEND_CAPABLE' ? 'operation can contact a real person' : undefined);
+    const allowed =
+      action === 'SAFE_WRITE' ||
+      (action === 'IMPORT_CAPABLE' && operation.allowImport === true) ||
+      (action === 'SEND_CAPABLE' && this.mode === 'live' && operation.allowSend === true);
+    const reason = operation.reason ??
+      (action === 'IMPORT_CAPABLE'
+        ? 'operation writes approved prospect data to an execution provider'
+        : action === 'SEND_CAPABLE'
+          ? 'operation can contact a real person'
+          : undefined);
     this.audit({
       at: new Date().toISOString(),
       service: operation.adapter,
@@ -76,8 +85,9 @@ export class OutboundSafetyGuard {
       summary: operation.summary,
     });
     if (!allowed) {
-      const why =
-        this.mode === 'locked'
+      const why = action === 'IMPORT_CAPABLE'
+        ? `${reason} (explicit allowImport required for this call)`
+        : this.mode === 'locked'
           ? `${reason} (SEND_MODE=locked)`
           : `${reason} (live mode requires explicit allowSend for this call)`;
       throw new SafetyError(why);

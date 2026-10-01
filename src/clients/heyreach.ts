@@ -32,7 +32,35 @@ export interface HeyReachCampaign {
   };
 }
 
-interface Page<T> {
+export interface HeyReachList {
+  id: number;
+  name: string;
+  totalItemsCount?: number;
+  count?: number;
+  listType: string;
+  campaignIds?: number[];
+}
+
+export interface HeyReachAccount {
+  id: number;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAddress?: string | null;
+  isActive?: boolean;
+  status?: string | null;
+}
+
+export interface HeyReachImportResult {
+  addedLeadsCount?: number;
+  updatedLeadsCount?: number;
+  failedLeadsCount?: number;
+  added?: number;
+  updated?: number;
+  failed?: number;
+  [key: string]: unknown;
+}
+
+export interface Page<T> {
   totalCount: number;
   items: T[];
 }
@@ -68,6 +96,7 @@ export class HeyReachClient {
       adapter: 'heyreach',
       operation,
       target: path,
+      allowImport: ctx.allowImport,
       allowSend: ctx.allowSend,
       reason: action === 'SEND_CAPABLE' ? `${operation} can start or resume LinkedIn outreach` : undefined,
       summary: body === undefined ? undefined : JSON.stringify(body).slice(0, 400),
@@ -88,13 +117,35 @@ export class HeyReachClient {
   }
 
   listLinkedInAccounts(offset = 0, limit = 100) {
-    return this.http.post<Page<Record<string, unknown>>>('/li_account/GetAll', { offset, limit });
+    return this.http.post<Page<HeyReachAccount>>('/li_account/GetAll', { offset, limit });
   }
 
   listLeadLists(offset = 0, limit = 100, keyword?: string) {
-    return this.http.post<Page<{ id: number; name: string; count: number; listType: string }>>(
+    return this.http.post<Page<HeyReachList>>(
       '/list/GetAll',
       { offset, limit, keyword, listType: 'USER_LIST' },
+    );
+  }
+
+  getLeadList(listId: number) {
+    return this.http.get<HeyReachList>(`/list/GetById?listId=${listId}`);
+  }
+
+  getCampaignSequence(campaignId: number) {
+    return this.http.get<Record<string, unknown>>(`/campaign/GetCampaignSequence?campaignId=${campaignId}`);
+  }
+
+  getLeadsFromList(listId: number, offset = 0, limit = 100) {
+    return this.http.post<Page<Record<string, unknown>>>('/list/GetLeadsFromList', { listId, offset, limit });
+  }
+
+  addLeadsToList(listId: number, leads: HeyReachLead[], ctx: GuardContext = {}) {
+    return this.write<HeyReachImportResult>(
+      'IMPORT_CAPABLE',
+      'add_leads_to_list',
+      '/list/AddLeadsToListV2',
+      { listId, leads },
+      ctx,
     );
   }
 
@@ -126,6 +177,19 @@ export class HeyReachClient {
       offset,
       limit,
     });
+  }
+
+  getChatroom(accountId: number, conversationId: string | number) {
+    return this.http.get<Record<string, unknown>>(`/inbox/GetChatroom/${accountId}/${conversationId}`);
+  }
+
+  stopLeadInCampaign(campaignId: number, profileUrl: string) {
+    return this.write<Record<string, unknown>>(
+      'SAFE_WRITE',
+      'stop_lead_in_campaign',
+      '/campaign/StopLeadInCampaign',
+      { campaignId, leadUrl: profileUrl },
+    );
   }
 
   getCampaignStats(campaignId: number, startDate: string, endDate: string) {

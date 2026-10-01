@@ -19,6 +19,7 @@ import { getDraftingQueue, SequenceInput, saveSequence } from './pipeline/sequen
 import { doctor, getSellerProfile, init, SellerProfile, setSellerProfile, syncSellerFromSource } from './pipeline/setup.js';
 import { ensureSubscription, getSetup, pauseSubscription, resumeSubscription, sourceLeads, updateIcp } from './pipeline/source.js';
 import { MARKET_MAP_TOOLS } from './market-map/tools.js';
+import { MARKET_RUNTIME_TOOLS } from './market-runtime/tools.js';
 
 export interface ToolDef<S extends z.ZodRawShape = z.ZodRawShape> {
   name: string;
@@ -142,6 +143,7 @@ export const TOOLS: ToolDef[] = [
     handler: (a) => enrichFromOverloop({ limit: a.limit }),
   }),
   ...MARKET_MAP_TOOLS,
+  ...MARKET_RUNTIME_TOOLS,
   def({
     name: 'gtm_get_classification_queue',
     title: 'Leads to classify',
@@ -207,9 +209,9 @@ export const TOOLS: ToolDef[] = [
   }),
   def({
     name: 'gtm_sync_results',
-    title: 'Sync results + detect replies',
+    title: 'LEGACY: sync Overloop results + replies',
     description:
-      'Pull opens / clicks / replies / bounces for every pushed lead (only engagement after our push counts) and open a reply item for every new reply.',
+      'Optional legacy Overloop path only. The active V1 path uses gtm_sync_heyreach_results and gtm_sync_heyreach_replies.',
     input: {},
     handler: async () => ({ results: await syncResults(), replies: await detectReplies() }),
   }),
@@ -306,7 +308,7 @@ export const TOOLS: ToolDef[] = [
   }),
   def({
     name: 'gtm_get_performance',
-    title: 'Performance analytics',
+    title: 'LEGACY: Overloop performance analytics',
     description:
       'Reply / positive / meeting rates by signal, tier, persona, route, hook_type, intent and playbook version, plus replied vs. non-replied examples. Input for the learning step.',
     input: { include_simulated: z.boolean().default(true), since_days: z.number().int().default(90) },
@@ -323,7 +325,7 @@ export const TOOLS: ToolDef[] = [
   }),
   def({
     name: 'gtm_save_learnings',
-    title: 'Save learnings (feed intelligence back)',
+    title: 'LEGACY: save Max/Overloop learnings',
     description:
       'Record evidence-backed insights, optionally the full updated playbook_markdown, weight multipliers (signal:/persona:/route:/hook:/tier:) and Max subscription changes (suggested, or applied when apply_subscription_changes=true).',
     input: LearningInput.shape,
@@ -332,7 +334,7 @@ export const TOOLS: ToolDef[] = [
   def({
     name: 'gtm_write_report',
     title: 'Write the daily brief',
-    description: 'Write reports/<date>.md: leads, routing, sequences, pushes, performance, learnings, safety.',
+    description: 'Write reports/<date>.md for the active Market Map → human review → gated HeyReach path, including real outcomes and proposal-only learning.',
     input: { date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() },
     handler: (a) => writeReport(a.date),
   }),

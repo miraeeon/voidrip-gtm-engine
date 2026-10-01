@@ -123,4 +123,82 @@ CREATE TABLE IF NOT EXISTS candidate_sequences (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_candidate_sequences ON candidate_sequences(candidate_id, project_id, version);
+
+CREATE TABLE IF NOT EXISTS provider_activations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidate_id INTEGER NOT NULL REFERENCES candidates(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  sequence_id INTEGER NOT NULL REFERENCES candidate_sequences(id),
+  provider TEXT NOT NULL,
+  provider_campaign_id TEXT NOT NULL,
+  provider_list_id TEXT,
+  provider_lead_id TEXT,
+  provider_profile_url TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'REVIEW_READY',
+  import_approved_at TEXT,
+  staged_at TEXT,
+  launch_approved_at TEXT,
+  launched_at TEXT,
+  stopped_at TEXT,
+  last_synced_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(provider, provider_campaign_id, candidate_id, sequence_id)
+);
+CREATE INDEX IF NOT EXISTS idx_provider_activations_status ON provider_activations(provider, status);
+
+CREATE TABLE IF NOT EXISTS market_outcome_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activation_id INTEGER REFERENCES provider_activations(id),
+  candidate_id INTEGER NOT NULL REFERENCES candidates(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  event_type TEXT NOT NULL,
+  event_at TEXT NOT NULL,
+  source TEXT NOT NULL,
+  provider_event_key TEXT,
+  value_number REAL,
+  currency TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  is_simulated INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  UNIQUE(source, provider_event_key)
+);
+CREATE INDEX IF NOT EXISTS idx_market_outcomes_candidate ON market_outcome_events(candidate_id, project_id, event_at);
+
+CREATE TABLE IF NOT EXISTS market_replies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  activation_id INTEGER REFERENCES provider_activations(id),
+  candidate_id INTEGER NOT NULL REFERENCES candidates(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  provider_message_id TEXT,
+  channel TEXT NOT NULL DEFAULT 'linkedin',
+  status TEXT NOT NULL,
+  text TEXT,
+  category TEXT,
+  sentiment TEXT,
+  summary TEXT,
+  next_action TEXT,
+  draft_response TEXT,
+  follow_up_on TEXT,
+  received_at TEXT,
+  detected_at TEXT NOT NULL,
+  triaged_at TEXT,
+  resolved_at TEXT,
+  actions_json TEXT NOT NULL DEFAULT '[]',
+  is_simulated INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(activation_id, provider_message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_market_replies_status ON market_replies(status);
+
+CREATE TABLE IF NOT EXISTS market_learning_proposals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_date TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  real_outcome_count INTEGER NOT NULL,
+  insights_json TEXT NOT NULL,
+  weight_changes_json TEXT NOT NULL DEFAULT '{}',
+  playbook_change TEXT,
+  created_at TEXT NOT NULL,
+  reviewed_at TEXT
+);
 `;

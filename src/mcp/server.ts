@@ -16,11 +16,12 @@ import { getBoundaryContract } from '../market-map/boundary.js';
 const UNATTENDED = process.env.GTM_UNATTENDED === '1';
 
 const INSTRUCTIONS = `VOIDRIP GTM Engine: SourceAdapter supplies candidates; ExecutionAdapter manages outbound drafts, activation and results. Max and Overloop are optional bundled adapters; Codex is the qualification and orchestration engine.
-Daily loop: gtm_sync_results -> gtm_get_performance -> gtm_save_learnings -> gtm_source_leads -> gtm_get_classification_queue -> gtm_save_classifications -> gtm_get_drafting_queue -> gtm_save_sequence (draft, critique, final) -> gtm_push_to_overloop -> gtm_verify_overloop -> gtm_write_report.
-Local E2E: gtm_ingest_candidates -> gtm_get_resolution_queue -> gtm_save_project_resolution -> gtm_get_boundary_queue -> gtm_save_boundary_qualifications -> gtm_get_priority_queue -> gtm_save_activation_scores -> gtm_get_market_drafting_queue -> gtm_save_candidate_sequence -> gtm_get_market_review_queue. Stop there: no provider push or send.
-HeyReach V1: gtm_verify_heyreach only inspects the existing configured campaign. It never creates, edits, enrolls, starts or resumes anything.
-Rules: the lead's buying signal is the hook of the first touch; every message must be specific to one person; never invent facts; no signatures (Overloop adds them).
-Safety: SEND_MODE=${safeMode()} — in locked mode campaigns are inert drafts and enrollment is blocked in code. Never try to work around the SafetyGuard.${UNATTENDED ? ' This is an unattended run: approval, launch, cleanup, simulations and source-control mutations are not exposed.' : ''}`;
+Daily loop: gtm_get_activation_readiness -> gtm_sync_heyreach_results -> gtm_sync_heyreach_replies -> gtm_sync_market_map_snapshot -> resolve -> qualify -> signal -> prioritize -> draft -> gtm_get_daily_buffer -> human-review sheet -> report. Stop at human review.
+Local E2E: gtm_ingest_candidates -> gtm_get_resolution_queue -> gtm_save_project_resolution -> gtm_get_boundary_queue -> gtm_save_boundary_qualifications -> gtm_get_priority_queue -> gtm_save_activation_scores -> gtm_get_market_drafting_queue -> gtm_save_candidate_sequence -> gtm_get_market_review_queue.
+HeyReach V1 uses two distinct gates: gtm_approve_heyreach_import then gtm_stage_heyreach_import; later gtm_approve_heyreach_launch then gtm_launch_heyreach. Never combine the approvals. Adding approved leads targets the configured lead list while the campaign remains DRAFT.
+Results and learning: provider events, exact replies, Scan and sales stay tied to Person + Project. Learning creates a proposal; a human separately approves it. The Boundary is never changed automatically.
+Rules: the public project signal is the hook; every message must be specific to one person; never invent facts; never send a reply automatically.
+Safety: SEND_MODE=${safeMode()} — in locked mode campaign launch is blocked in code. Provider import also requires explicit allowImport. Never try to work around the SafetyGuard.${UNATTENDED ? ' This is an unattended run: provider writes, approvals, launch, reply triage, learning application, simulations and source-control mutations are not exposed.' : ''}`;
 
 function safeMode() {
   try {
@@ -67,7 +68,7 @@ server.registerResource('boundary', 'gtm://boundary', { title: 'GTM Boundary V1'
 
 server.registerPrompt(
   'daily-loop',
-  { title: 'Run the daily GTM loop', description: 'Run today’s full loop: learn -> source -> classify/route -> write -> push -> report.' },
+  { title: 'Prepare the daily GTM review buffer', description: 'Refresh the governed Market Map and prepare up to 20 evidence-backed prospects for human review without provider writes.' },
   () => ({
     messages: [
       {
@@ -75,8 +76,9 @@ server.registerPrompt(
         content: {
           type: 'text' as const,
           text:
-            'Run today’s VOIDRIP GTM loop end to end using the gtm_* tools, following the server instructions. ' +
-            'Classify and route every new lead, write a lead-specific sequence for each (draft, self-critique, then final), push to Overloop, verify everything is inert, and write the daily brief. Summarize what you did and what you learned.',
+            'Run today’s VOIDRIP GTM preparation loop using the governed Drive Market Map and the gtm_* tools. ' +
+            'Preflight the locked HeyReach configuration, sync results and replies only for previously launched activations, refresh Person + Project records, qualify, refresh public signals, prioritize and draft until the human-review buffer reaches 20 or report the exact evidence-backed deficit. ' +
+            'Stop at the review sheet. Do not approve, import, launch, send, or apply a learning proposal. Confirm every provider action remained NONE.',
         },
       },
     ],

@@ -1,3 +1,9 @@
+# Guide hérité du repo amont — ne pas utiliser pour VOIDRIP V1
+
+Ce document décrit encore le parcours Max/Overloop du projet d’origine. Pour le système actuel, utiliser [VOIDRIP_GTM_V1.md](VOIDRIP_GTM_V1.md). Ne pas installer le scheduler, importer de prospects ou lancer de campagne à partir des instructions ci-dessous.
+
+---
+
 # Getting started: clone to first daily loop
 
 This guide takes you from nothing to a working, scheduled GTM loop on your own machine. It takes about 15 minutes. Every command is shown for **Windows (PowerShell)** and **macOS / Linux (bash)** where they differ.

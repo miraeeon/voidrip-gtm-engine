@@ -27,13 +27,14 @@ Codex orchestrates a persistent Market Map. Drive remains the governed operation
 
 ### 0. Preflight
 
-- Run `gtm_doctor`, `gtm_status`, `gtm_verify_heyreach`, then `gtm_get_daily_buffer`.
+- Run `gtm_doctor`, `gtm_status`, `gtm_verify_heyreach`, `gtm_get_activation_readiness`, then `gtm_get_daily_buffer`.
 - HeyReach must remain the configured campaign, `DRAFT`, with no outreach in progress.
+- The configured lead list, official sequence and active assigned LinkedIn account must pass readiness before the system can be enabled.
 - A provider outage does not authorize a fallback provider or a new campaign.
 
 ### 1. Sync results and replies
 
-- Only after a campaign has previously run: sync HeyReach results and replies.
+- Only after a campaign has previously run: call `gtm_sync_heyreach_results` and `gtm_sync_heyreach_replies`.
 - Replies always take priority over new sourcing.
 - Never send a reply automatically.
 
@@ -79,9 +80,18 @@ Codex orchestrates a persistent Market Map. Drive remains the governed operation
 - The sheet is the human approval surface; engine status is not approval.
 - Stop at review. Perform no HeyReach write.
 
-### 8. Report
+### 8. Learning readiness
+
+- Read `gtm_get_market_performance` only from real outcomes.
+- A learning iteration creates `gtm_save_market_learning_proposal`; it never applies itself.
+- `gtm_review_market_learning` is a separate human-only action and is not available unattended.
+- Never change the Boundary automatically.
+
+### 9. Report
 
 Report the ready count / 20, the exact deficit, the blocking stage, new qualifications, signals, clean drafts, HOLD reasons, and HeyReach read-only state. Confirm that no lead was imported and no campaign was started.
+
+Do not install the OS schedule until Jen explicitly decides to enable the finished system.
 
 ## Quality bar
 

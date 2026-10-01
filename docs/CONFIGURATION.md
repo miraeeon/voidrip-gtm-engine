@@ -1,3 +1,5 @@
+> **Référence VOIDRIP active :** [VOIDRIP_GTM_V1.md](VOIDRIP_GTM_V1.md). Cette page décrit la configuration héritée Max/Overloop et ne doit pas être utilisée pour activer VOIDRIP V1.
+
 # Configuration reference
 
 All settings live in `.env` at the repo root (or the file named by `GTM_ENV_FILE`).
