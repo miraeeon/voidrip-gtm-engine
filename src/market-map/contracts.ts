@@ -80,6 +80,7 @@ export const SignalEventInput = z.object({
   source_signal_id: z.string().trim().min(1),
   signal_type: z.string().trim().min(1),
   source: z.string().trim().min(1),
+  url: nullableText,
   event_date: z.string().trim().min(1).nullable().optional(),
   evidence: z.string().trim().min(1).max(4000),
   strength: z.number().int().min(1).max(5).nullable().optional(),

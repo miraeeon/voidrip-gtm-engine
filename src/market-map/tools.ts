@@ -18,7 +18,7 @@ import {
   saveBoundaryQualifications,
   saveProjectResolution,
 } from './qualification.js';
-import { getMarketDraftingQueue, getMarketReviewQueue, saveCandidateSequence } from './drafting.js';
+import { getMarketDraftingQueue, getMarketReviewQueue, saveCandidateSequence, saveCandidateSequences } from './drafting.js';
 import { getSignalQueue, saveSignalEvents } from './signals.js';
 import { syncMarketMapSnapshot } from './snapshot.js';
 import { getDailyBuffer } from './daily-buffer.js';
@@ -114,6 +114,13 @@ export const MARKET_MAP_TOOLS: ToolDef[] = [
     description: 'Lint and version a local sequence. A clean final enters human review; nothing is pushed or sent.',
     input: CandidateSequenceInput.shape,
     handler: (args) => saveCandidateSequence(args),
+  }),
+  def({
+    name: 'gtm_save_candidate_sequences',
+    title: 'Save a batch of local Person + Project sequences',
+    description: 'Lint and version up to 100 local sequences. Clean finals enter human review; no provider action occurs.',
+    input: { items: z.array(CandidateSequenceInput).min(1).max(100) },
+    handler: (args) => saveCandidateSequences(args.items),
   }),
   def({
     name: 'gtm_get_market_review_queue',

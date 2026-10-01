@@ -24,7 +24,7 @@ export function getSignalQueue(limit = 20) {
   ).map((item) => ({
     ...item,
     signals: all<any>(
-      `SELECT source_signal_id, signal_type, source, event_date, evidence, strength, mentionability, created_at
+      `SELECT source_signal_id, signal_type, source, url, event_date, evidence, strength, mentionability, created_at
          FROM signal_events WHERE candidate_id = ? AND project_id = ? ORDER BY created_at DESC`,
       item.id,
       item.project_id,
@@ -57,17 +57,17 @@ export function saveSignalEvents(items: unknown[]) {
       );
       if (existing) {
         run(
-          `UPDATE signal_events SET candidate_id=?, project_id=?, signal_type=?, event_date=?, evidence=?, strength=?, mentionability=? WHERE id=?`,
-          input.candidate_id, input.project_id, input.signal_type, input.event_date ?? null, input.evidence,
+          `UPDATE signal_events SET candidate_id=?, project_id=?, signal_type=?, url=?, event_date=?, evidence=?, strength=?, mentionability=? WHERE id=?`,
+          input.candidate_id, input.project_id, input.signal_type, input.url ?? null, input.event_date ?? null, input.evidence,
           input.strength ?? null, input.mentionability, existing.id,
         );
         saved.push({ candidate_id: input.candidate_id, project_id: input.project_id, signal_event_id: existing.id, action: 'updated' });
       } else {
         const result = run(
-          `INSERT INTO signal_events(candidate_id, project_id, source_signal_id, signal_type, source, event_date,
-            evidence, strength, mentionability, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          `INSERT INTO signal_events(candidate_id, project_id, source_signal_id, signal_type, source, url, event_date,
+            evidence, strength, mentionability, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
           input.candidate_id, input.project_id, input.source_signal_id, input.signal_type, input.source,
-          input.event_date ?? null, input.evidence, input.strength ?? null, input.mentionability, nowIso(),
+          input.url ?? null, input.event_date ?? null, input.evidence, input.strength ?? null, input.mentionability, nowIso(),
         );
         saved.push({ candidate_id: input.candidate_id, project_id: input.project_id, signal_event_id: Number(result.lastInsertRowid), action: 'inserted' });
       }

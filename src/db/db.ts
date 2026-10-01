@@ -186,6 +186,7 @@ const MIGRATIONS: [table: string, column: string, ddl: string][] = [
   ['projects', 'external_id', 'ALTER TABLE projects ADD COLUMN external_id TEXT'],
   ['boundary_qualifications', 'source_qualification_id', 'ALTER TABLE boundary_qualifications ADD COLUMN source_qualification_id TEXT'],
   ['signal_events', 'source_signal_id', 'ALTER TABLE signal_events ADD COLUMN source_signal_id TEXT'],
+  ['signal_events', 'url', 'ALTER TABLE signal_events ADD COLUMN url TEXT'],
 ];
 
 function migrate(db: DatabaseSync): void {

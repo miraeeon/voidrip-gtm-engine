@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS signal_events (
   project_id INTEGER NOT NULL REFERENCES projects(id),
   signal_type TEXT NOT NULL,
   source TEXT NOT NULL,
+  url TEXT,
   event_date TEXT,
   evidence TEXT NOT NULL,
   strength INTEGER,

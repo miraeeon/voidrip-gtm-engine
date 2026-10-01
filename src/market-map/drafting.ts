@@ -114,13 +114,23 @@ export function saveCandidateSequence(raw: unknown) {
   return result;
 }
 
+export function saveCandidateSequences(items: unknown[]) {
+  const saved = items.map((item) => saveCandidateSequence(item));
+  return { saved };
+}
+
 export function getMarketReviewQueue(limit = 25) {
   return all<any>(
     `SELECT s.id sequence_id, s.candidate_id, s.project_id, s.version, s.route, s.angle, s.hook_type,
             s.steps_json, s.lint_json, s.critique, s.review_status, s.created_at,
-            c.name, c.linkedin_url, c.email, c.current_role, c.current_org,
+            c.external_id, c.name, c.linkedin_url, c.email, c.current_role, c.current_org,
             p.name project_name, p.url project_url,
-            b.boundary_status, b.evidence_summary, a.priority_tier, a.intent_strength, a.freshness
+            b.boundary_status, b.kernel_primary, b.evidence_summary, a.priority_tier, a.intent_strength, a.freshness,
+            (SELECT se.source FROM signal_events se WHERE se.candidate_id=c.id AND se.project_id=p.id ORDER BY se.created_at DESC LIMIT 1) signal_source,
+            (SELECT se.url FROM signal_events se WHERE se.candidate_id=c.id AND se.project_id=p.id ORDER BY se.created_at DESC LIMIT 1) signal_url,
+            (SELECT se.event_date FROM signal_events se WHERE se.candidate_id=c.id AND se.project_id=p.id ORDER BY se.created_at DESC LIMIT 1) signal_date,
+            (SELECT se.evidence FROM signal_events se WHERE se.candidate_id=c.id AND se.project_id=p.id ORDER BY se.created_at DESC LIMIT 1) signal_evidence,
+            (SELECT se.strength FROM signal_events se WHERE se.candidate_id=c.id AND se.project_id=p.id ORDER BY se.created_at DESC LIMIT 1) signal_strength
        FROM candidate_sequences s
        JOIN candidates c ON c.id = s.candidate_id
        JOIN projects p ON p.id = s.project_id
@@ -129,7 +139,8 @@ export function getMarketReviewQueue(limit = 25) {
        )
        JOIN activation_scores a ON a.id = s.activation_score_id
       WHERE s.status = 'final' AND s.review_status = 'pending'
-      ORDER BY CASE a.priority_tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 ELSE 2 END, s.created_at ASC
+      ORDER BY CASE a.priority_tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 ELSE 2 END,
+               COALESCE(a.intent_strength, 0) DESC, s.created_at ASC
       LIMIT ?`,
     limit,
   ).map((item) => ({
